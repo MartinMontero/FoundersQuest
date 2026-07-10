@@ -716,6 +716,17 @@ function useInstrument() {
       const entry = { date: s.date, cards: s.cards.length, spoke: s.cards.filter((c) => c.spoke).length, matches: s.cards.filter((c) => c.bucket === 'Been there').length }
       return { ...d, dinnerSession: null, dinnerLog: [...d.dinnerLog, entry] }
     })
+  // ── Council (Stage E) ──
+  const setCouncilConsent = () => setData((d) => ({ ...d, councilConsent: true }))
+  const saveReading = (r) =>
+    setData((d) => ({
+      ...d,
+      council: [...d.council, { id: uid('c'), date: nowISO(), reading: r.reading, commitment: null, followups: [], journal: r.journal, source: r.source }],
+    }))
+  const setCommitment = (id, text) =>
+    setData((d) => ({ ...d, council: d.council.map((c) => (c.id === id ? { ...c, commitment: text } : c)) }))
+  const addFollowup = (id, q, a) =>
+    setData((d) => ({ ...d, council: d.council.map((c) => (c.id === id ? { ...c, followups: [...(c.followups || []), { q, a }] } : c)) }))
   return {
     ...q,
     patchAnswer,
@@ -744,6 +755,10 @@ function useInstrument() {
     addDinnerCard,
     updateDinnerCard,
     endDinner,
+    setCouncilConsent,
+    saveReading,
+    setCommitment,
+    addFollowup,
   }
 }
 
@@ -1781,12 +1796,218 @@ function DinnerView({ data, mut }) {
   )
 }
 
+/* ═══ Stage E: the Council (client) ══════════════════════════════════════ */
+// Canonical copy — verbatim from canon 04.
+const COUNCIL_CAPTION = 'The Council reads your evidence. It cannot see your market.'
+const COUNCIL_CONSENT =
+  'Convening the Council sends your journal text to the model for this reading — nothing else is sent, and the app keeps nothing beyond the readings you save. Your journal may contain names and quotes from real people; that is worth knowing before it travels.'
+const COUNCIL_ERROR = 'The Council is not in session. Your journal is untouched; try again soon.'
+const COUNCIL_THIN = 'The Council needs more ink. Answer the Stage 1 threshold, at least.'
+const COUNCIL_COMMITMENT =
+  "Before you answer the Council — name one thing you'll change because of this reading. Change first; rebuttal after."
+
+// BYOK: allowlist mirrors the Function; the founder picks when their key can't reach Fable 5.
+const COUNCIL_MODELS = [
+  { id: 'claude-fable-5', label: 'Fable 5 (default)' },
+  { id: 'claude-opus-4-8', label: 'Opus 4.8' },
+  { id: 'claude-sonnet-5', label: 'Sonnet 5' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+]
+// The key lives under its OWN storage key — never inside founders-quest:v3, so it
+// can never be serialized into a Journal, Brief, or Council payload.
+const COUNCIL_KEY_STORE = 'founders-quest:council-key'
+
+// The Council's system prompt — embedded byte-for-byte from canon 04 (do not edit by hand).
+const COUNCIL_SYSTEM_PROMPT = "You are the Council in Founder's Quest — the reading a founder receives when they bring their journal back from the road. You are not a cheerleader and not a judge. You are three voices in one reading: the Mirror (what the record shows), the Shadow (what the founder is avoiding), and the Cartographer (where the evidence says to walk next).\n\nYour material is the journal alone. Every claim you make must trace to something written in it — quote the founder's own words back to them, briefly, when you do. You know nothing about their market, their customers, or their odds beyond what the journal contains, and you say so where it matters. If the journal is thin, say the reading needs more ink and name exactly which pages; never pad a thin journal with invented insight.\n\nHow to read:\n- Weigh evidence by its tier. E3 (Seen) and E4 (Paid) entries are load-bearing; E0-E1 are decoration until tested. An argument built on hunches is a hunch with better posture.\n- Read the gaps as hard as the ink: unanswered falsification questions, guardians without kill criteria, gates crossed without proof, a Truth score far below Action. Absence is evidence about the founder.\n- Read across stages for contradictions: the person named in Stage 1 versus the one paying in Stage 7; the root cause in the Five Whys versus the idea taken from the Vault; the sealed Thread versus the verdict and the decision that followed. If the verdict and the decision disagree, name it — gently, and first.\n- Read the loop learnings and the trail as the founder's actual path. Where they keep returning is where the truth is snagged.\n\nThe reading — one page, always; dense, never long:\n1. WHAT THE RECORD SHOWS — three to five observations, each anchored in the journal. Patterns, not summary; the founder wrote it and does not need it read back.\n2. WHAT THE RECORD IS SILENT ON — the load-bearing gaps, at most three, named plainly.\n3. THE SHADOW'S PARAGRAPH — the strongest honest case against the current course, built only from their own entries. Fierce, never cruel. One paragraph.\n4. THE ROAD — strategy in the only form a young venture can hold: a diagnosis in one sentence (what the evidence says the situation actually is), a guiding stance in one sentence (what follows from it), and the next two or three tests in order — riskiest assumption first, each with the cheapest possible design, a timeframe in days not months, and the result that means stop. Do not draft a grand plan the journal cannot carry.\n5. ONE LINE TO KEEP — the distilled wisdom: a single sentence the founder could write on the wall.\n6. ONE QUESTION TO CARRY — end on the question they are most avoiding. Never end on advice.\n\nVoice: plain, warm, direct. Second person. No jargon, no flattery, no hedging rituals. If the journal shows a founder exhausted or despairing, answer that first, the way a person would, before any analysis. Never break character, and never invent what the journal does not contain.\n\nCadence: the journal may include a Weather Trail — the founder's one-tap check-ins over time. Read it like an accelerator staffer reads the room. When the founder is in the trough (recent low weather, or the record shows the mid-journey winter: heavy activity, fresh invalidations, loop after loop), your job is steadying before sharpening: name the trough as the map's prediction rather than their failure, keep the Shadow's paragraph short, and shrink THE ROAD to one small winnable test. Pressure belongs on the upswing, never in the trough. Read weather as weather — you are a mentor with a map, not a clinician; never diagnose."
+
+function ConsentGate({ onConsent }) {
+  return (
+    <section className="mx-auto max-w-3xl px-4 pt-4 pb-24">
+      <h2 className="text-xl font-semibold tracking-tight">The Council</h2>
+      <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+        <p className="text-sm text-neutral-200">{COUNCIL_CONSENT}</p>
+        <button onClick={onConsent} className={primaryBtn + ' mt-3'}>I understand — set up the Council</button>
+      </div>
+    </section>
+  )
+}
+
+function CommitmentInput({ onSet }) {
+  const [t, setT] = useState('')
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input value={t} onChange={(e) => setT(e.target.value)} placeholder="The one thing I'll change…" className={fieldCls + ' flex-1 min-w-[200px]'} />
+      <button onClick={() => t.trim() && onSet(t.trim())} disabled={!t.trim()} className={primaryBtn}>Commit, then rebut</button>
+    </div>
+  )
+}
+
+function CouncilView({ data, mut }) {
+  const store = mut.store
+  const [key, setKey] = useState(() => store.get(COUNCIL_KEY_STORE) || '')
+  const [remember, setRemember] = useState(() => !!store.get(COUNCIL_KEY_STORE))
+  const [model, setModel] = useState('claude-fable-5')
+  const [showModel, setShowModel] = useState(false)
+  const [mode, setMode] = useState('live')
+  const [pasted, setPasted] = useState('')
+  const [status, setStatus] = useState('idle')
+  const [follow, setFollow] = useState('')
+
+  if (!data.councilConsent) return <ConsentGate onConsent={mut.setCouncilConsent} />
+
+  const answered = STAGES.reduce((n, s) => n + Object.values(data.answers[s.id] || {}).filter((a) => serializeAnswer(a).length).length, 0)
+  const journalText = mode === 'live' ? buildJournalMd(data, 'compact') : pasted
+  const thinInk = mode === 'live' && answered < 3 && data.evidence.length === 0
+  const hasKey = !!key.trim()
+  const latest = data.council[data.council.length - 1]
+
+  const persistKey = (k, rem) => {
+    if (rem && k.trim()) store.set(COUNCIL_KEY_STORE, k.trim())
+    else store.remove(COUNCIL_KEY_STORE)
+  }
+  const onKey = (v) => { setKey(v); persistKey(v, remember) }
+  const onRemember = (v) => { setRemember(v); persistKey(key, v) }
+  const forgetKey = () => { setKey(''); setRemember(false); store.remove(COUNCIL_KEY_STORE) }
+
+  const call = async (messages) => {
+    const res = await fetch('/api/council', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-council-key': key.trim() },
+      body: JSON.stringify({ system: COUNCIL_SYSTEM_PROMPT, model, messages }),
+    })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok || !j.text) throw new Error(j.error || 'no-text')
+    return j.text
+  }
+
+  const convene = async () => {
+    setStatus('loading')
+    try {
+      const text = await call([{ role: 'user', content: journalText }])
+      mut.saveReading({ reading: text, journal: journalText, source: mode })
+      setStatus('idle')
+    } catch {
+      setStatus('error')
+      setShowModel(true)
+    }
+  }
+
+  const askFollowup = async () => {
+    if (!follow.trim() || !latest) return
+    setStatus('loading')
+    try {
+      const history = [
+        { role: 'user', content: latest.journal },
+        { role: 'assistant', content: latest.reading },
+        ...(latest.followups || []).flatMap((f) => [{ role: 'user', content: f.q }, { role: 'assistant', content: f.a }]),
+        { role: 'user', content: follow.trim() },
+      ]
+      const text = await call(history)
+      mut.addFollowup(latest.id, follow.trim(), text)
+      setFollow('')
+      setStatus('idle')
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  return (
+    <section className="mx-auto max-w-3xl space-y-4 px-4 pt-4 pb-24">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">The Council</h2>
+        <p className="mt-1 text-sm text-neutral-400">{COUNCIL_CAPTION}</p>
+      </div>
+
+      {/* BYOK key */}
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+        <h3 className="text-sm font-medium text-neutral-100">Your key</h3>
+        <p className="text-2xs text-neutral-500">Bring your own Anthropic key. It stays in your browser, rides one request to the model, and is never stored on a server or written to logs.</p>
+        {hasKey ? (
+          <div className="mt-2 flex items-center gap-2 text-xs text-neutral-300">
+            <span className="rounded bg-emerald-900/40 px-2 py-0.5 text-emerald-300">key set{remember ? ' · remembered on this device' : ' · this session only'}</span>
+            <button onClick={forgetKey} className="text-2xs text-neutral-500 hover:text-rose-400">forget key</button>
+          </div>
+        ) : (
+          <input type="password" value={key} onChange={(e) => onKey(e.target.value)} placeholder="sk-ant-…" className={fieldCls + ' mt-2'} />
+        )}
+        <label className="mt-2 flex items-center gap-2 text-2xs text-neutral-400">
+          <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
+          Remember on this device (otherwise the key is forgotten when you close the tab)
+        </label>
+      </div>
+
+      {/* mode */}
+      <div className="flex gap-1 text-xs">
+        {[['live', 'Live record'], ['paste', 'Paste a journal']].map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)} className={'rounded px-3 py-1.5 ' + (mode === m ? 'bg-neutral-100 text-neutral-900' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800')}>{label}</button>
+        ))}
+      </div>
+      {mode === 'paste' && (
+        <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste a founder's journal for a mentor reading." rows={5} className={fieldCls} />
+      )}
+
+      {(showModel || model !== 'claude-fable-5') && (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+          <div className="text-2xs uppercase tracking-wider text-neutral-500">Model — pick one your key can reach</div>
+          <select value={model} onChange={(e) => setModel(e.target.value)} className={selectCls + ' mt-1'}>
+            {COUNCIL_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      {thinInk ? (
+        <p className="rounded border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">{COUNCIL_THIN}</p>
+      ) : (
+        <button onClick={convene} disabled={!hasKey || status === 'loading'} className={primaryBtn}>
+          {status === 'loading' ? 'The Council is reading…' : 'Convene the Council'}
+        </button>
+      )}
+      {status === 'error' && <p className="text-xs text-rose-300">{COUNCIL_ERROR}</p>}
+
+      {/* latest reading + commitment gate + follow-ups */}
+      {latest && (
+        <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 p-4">
+          <div className="text-2xs uppercase tracking-wider text-neutral-500">Reading · {d10(latest.date)} · {latest.source}</div>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-100">{latest.reading}</p>
+          <div className="mt-3 border-t border-neutral-800 pt-3">
+            {!latest.commitment ? (
+              <>
+                <p className="text-xs text-amber-200">{COUNCIL_COMMITMENT}</p>
+                <CommitmentInput onSet={(t) => mut.setCommitment(latest.id, t)} />
+              </>
+            ) : (
+              <>
+                <p className="text-2xs text-neutral-400">You committed to change: <span className="text-neutral-200">{latest.commitment}</span></p>
+                {(latest.followups || []).map((f, i) => (
+                  <div key={i} className="mt-2">
+                    <p className="text-xs font-medium text-neutral-200">{f.q}</p>
+                    <p className="whitespace-pre-wrap text-xs text-neutral-300">{f.a}</p>
+                  </div>
+                ))}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input value={follow} onChange={(e) => setFollow(e.target.value)} placeholder="Ask the Council a follow-up…" className={fieldCls + ' flex-1 min-w-[200px]'} />
+                  <button onClick={askFollowup} disabled={!follow.trim() || status === 'loading'} className={primaryBtn}>Ask</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {data.council.length > 1 && (
+        <p className="text-2xs text-neutral-500">{data.council.length} readings saved (with their journal snapshots) — all carried in your Journal export.</p>
+      )}
+    </section>
+  )
+}
+
 /* ── app root ─────────────────────────────────────────────────────────── */
 const VIEW_TABS = [
   { id: 'quest', label: 'Quest' },
   { id: 'registry', label: 'Registry' },
   { id: 'ledger', label: 'Ledger' },
   { id: 'vault', label: 'Vault' },
+  { id: 'council', label: 'Council' },
   { id: 'trail', label: 'Trail' },
   { id: 'dinner', label: 'Dinner' },
 ]
@@ -1818,6 +2039,7 @@ export default function App() {
         {view === 'registry' && <RegistryView data={data} mut={mut} />}
         {view === 'ledger' && <LedgerView data={data} mut={mut} />}
         {view === 'vault' && <VaultView data={data} mut={mut} />}
+        {view === 'council' && <CouncilView data={data} mut={mut} />}
         {view === 'trail' && <TrailView data={data} mut={mut} />}
         {view === 'dinner' && <DinnerView data={data} mut={mut} />}
       </div>
