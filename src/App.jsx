@@ -554,15 +554,12 @@ const PLACEHOLDER = {
   falsify: 'Be honest about what you actually see.',
 }
 
-// Special types still awaiting their mechanic (arrive in D2–D4). Text is saved now.
+// Special types still awaiting their mechanic (arrive in D3). Text is saved now.
 const PENDING_MECHANIC = {
   seal: "Ariadne's Thread",
   verdict: 'the verdict seal',
   vault: 'the Vault picker',
-  registry: 'the Registry funeral',
-  decision: 'the evidence-locked decision',
   spine: 'the evidence-locked Story Forge',
-  quickadd: 'quick-add guardians',
 }
 
 function useInstrument() {
@@ -810,8 +807,9 @@ function VaultNudge({ text, onCapture }) {
   )
 }
 
-function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault }) {
+function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault, data, mut }) {
   const text = answer.text || ''
+  const registersGuardian = q.type === 'quickadd' || q.id === 's3-l2' || q.id === 's7-th'
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
       {q.badge && <div className="text-2xs uppercase tracking-widest text-amber-300 mb-1">✦ {q.badge}</div>}
@@ -822,6 +820,13 @@ function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault }) {
         <FiveWhysInput whys={answer.whys} onChange={(whys) => onPatch({ whys })} />
       ) : q.type === 'ifthen' ? (
         <IfThenInput answer={answer} onPatch={onPatch} />
+      ) : q.type === 'registry' ? (
+        <>
+          <ProseInput value={text} onChange={(v) => onPatch({ text: v })} placeholder="Name the belief you're burying." rows={2} />
+          <FuneralPicker data={data} mut={mut} />
+        </>
+      ) : q.type === 'decision' ? (
+        <DecisionInput answer={answer} onPatch={onPatch} data={data} />
       ) : (
         <>
           <ProseInput value={text} onChange={(v) => onPatch({ text: v })} placeholder={PLACEHOLDER[q.type] || 'Write plainly.'} />
@@ -832,6 +837,14 @@ function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault }) {
             </p>
           )}
         </>
+      )}
+
+      {registersGuardian && (
+        <QuickAddGuardianInline
+          onAdd={mut.addGuardian}
+          originStageId={q.stageId}
+          placeholder={q.type === 'quickadd' ? 'This only works if…' : q.id === 's3-l2' ? 'Register the IF as a guardian…' : "Any figure you don't know — register it…"}
+        />
       )}
     </div>
   )
@@ -869,6 +882,8 @@ function StageView({ stageId, data, mut }) {
               onPatch={(patch) => mut.patchAnswer(stageId, q.id, patch)}
               isActI={isActI}
               onCaptureVault={mut.captureVault}
+              data={data}
+              mut={mut}
             />
           </React.Fragment>
         ))}
@@ -1106,6 +1121,100 @@ function ViewTabs({ view, setView, tabs }) {
         </button>
       ))}
     </nav>
+  )
+}
+
+// In-question mechanics wired to the Registry/Ledger (Stage D2).
+function QuickAddGuardianInline({ onAdd, originStageId, placeholder }) {
+  const [text, setText] = useState('')
+  const [importance, setImportance] = useState('wobbles')
+  const submit = () => {
+    if (!text.trim()) return
+    onAdd({ statement: text, importance, originStageId })
+    setText('')
+    setImportance('wobbles')
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-2">
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} className={fieldCls + ' flex-1 min-w-[200px]'} />
+      <select value={importance} onChange={(e) => setImportance(e.target.value)} className={selectCls}>
+        {IMPORTANCE_OPTS.map((o) => <option key={o.v} value={o.v}>{o.v}</option>)}
+      </select>
+      <button onClick={submit} disabled={!text.trim()} className="rounded bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-100 hover:bg-neutral-700 disabled:opacity-40">
+        + guardian
+      </button>
+    </div>
+  )
+}
+
+// s5-l5 · the funeral — mark a live belief invalidated (XP follows the tier≥2 rule).
+function FuneralPicker({ data, mut }) {
+  const open = data.assumptions.filter((a) => a.status === 'untested' || a.status === 'testing')
+  if (!open.length) {
+    return <p className="mt-2 text-2xs italic text-neutral-500">No open guardians to bury yet. Register your Stage-1 beliefs first, then return here.</p>
+  }
+  return (
+    <div className="mt-2 space-y-1.5">
+      {open.map((a) => (
+        <div key={a.id} className="flex items-center justify-between gap-2 rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5">
+          <span className="text-xs text-neutral-200">
+            {a.statement}
+            {a.originStageId === 's1' && <span className="ml-1.5 text-2xs text-neutral-500">· Stage 1</span>}
+          </span>
+          <button onClick={() => mut.updateGuardian(a.id, { status: 'invalidated' })} className="shrink-0 rounded border border-rose-700 bg-rose-900/50 px-2 py-0.5 text-2xs text-rose-200 hover:bg-rose-900">
+            Hold the funeral
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// s5-dec · pivot/persevere, locked until cited to ≥1 ledger entry.
+function DecisionInput({ answer, onPatch, data }) {
+  const cited = answer.citedEvidenceIds || []
+  const decision = answer.decision || ''
+  const locked = cited.length === 0
+  const toggleCite = (id) =>
+    onPatch({ citedEvidenceIds: cited.includes(id) ? cited.filter((x) => x !== id) : [...cited, id] })
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex gap-2">
+        {['pivot', 'persevere'].map((d) => (
+          <button
+            key={d}
+            onClick={() => !locked && onPatch({ decision: d })}
+            disabled={locked}
+            className={
+              'rounded border px-3 py-1.5 text-sm capitalize ' +
+              (decision === d ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300') +
+              (locked ? ' cursor-not-allowed opacity-40' : '')
+            }
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+      <div>
+        <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">
+          Cite the evidence that decides it {locked && <span className="text-amber-300">· required to unlock</span>}
+        </div>
+        {data.evidence.length === 0 ? (
+          <p className="text-2xs italic text-neutral-500">No ledger entries yet — the decision stays locked until at least one citation.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {data.evidence.map((e) => (
+              <button key={e.id} onClick={() => toggleCite(e.id)} className={'rounded border px-2 py-0.5 text-2xs ' + (cited.includes(e.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}>
+                E{e.tier} · {e.text.slice(0, 24)}{e.text.length > 24 ? '…' : ''}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {!locked && decision && (
+        <p className="text-2xs text-emerald-400">Decision recorded: {decision}, cited to {cited.length} entr{cited.length === 1 ? 'y' : 'ies'}.</p>
+      )}
+    </div>
   )
 }
 
