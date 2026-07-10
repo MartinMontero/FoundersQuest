@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Check } from 'lucide-react'
 
 /* ═══════════════════════════════════════════════════════════════════════
    Founder's Quest v3 — the static instrument. Single default export.
@@ -6,17 +7,131 @@ import React, { useState, useEffect, useRef } from 'react'
    Stage C: computed metrics · buildJournalMd (single serializer) · Brief.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── content: the stage spine (canon 03 headers) ──────────────────────── */
+/* ═══ content canon (question bank v3, verbatim from canon 03) ════════════
+   Format mirrors 03: id · type · verbatim text · hint (written in code per
+   law 3; 03 omits hints for budget). Untagged in 03 → type 'prose'. */
 const STAGES = [
-  { id: 's1', n: 1, name: 'The Problem', myth: 'The Call to Adventure', symbol: 'Swirling Nebula' },
-  { id: 's2', n: 2, name: 'Research', myth: 'Meeting the Mentor', symbol: 'The Raven' },
-  { id: 's3', n: 3, name: 'Prototyping', myth: 'The Approach', symbol: 'The Phoenix' },
-  { id: 's4', n: 4, name: 'Testing', myth: 'Crossing the Threshold', symbol: 'The Labyrinth' },
-  { id: 's5', n: 5, name: 'Feedback', myth: 'Tests, Allies & Enemies', symbol: 'The Mirror' },
-  { id: 's6', n: 6, name: 'Refinement', myth: 'The Ordeal', symbol: 'The Sculptor' },
-  { id: 's7', n: 7, name: 'Implementation', myth: 'The Road Back', symbol: 'The Bridge' },
-  { id: 's8', n: 8, name: 'Launch', myth: 'Return with the Elixir', symbol: 'The Rocket' },
+  { id: 's1', n: 1, name: 'The Problem', myth: 'The Call to Adventure', symbol: 'Swirling Nebula', act: 1 },
+  { id: 's2', n: 2, name: 'Research', myth: 'Meeting the Mentor', symbol: 'The Raven', act: 1 },
+  { id: 's3', n: 3, name: 'Prototyping', myth: 'The Approach', symbol: 'The Phoenix', act: 2 },
+  { id: 's4', n: 4, name: 'Testing', myth: 'Crossing the Threshold', symbol: 'The Labyrinth', act: 2 },
+  { id: 's5', n: 5, name: 'Feedback', myth: 'Tests, Allies & Enemies', symbol: 'The Mirror', act: 2 },
+  { id: 's6', n: 6, name: 'Refinement', myth: 'The Ordeal', symbol: 'The Sculptor', act: 3 },
+  { id: 's7', n: 7, name: 'Implementation', myth: 'The Road Back', symbol: 'The Bridge', act: 3 },
+  { id: 's8', n: 8, name: 'Launch', myth: 'Return with the Elixir', symbol: 'The Rocket', act: 3 },
 ]
+
+// Field-rules banners shown atop a stage (canon 03).
+const STAGE_BANNERS = {
+  s2: 'Talk about their life, not your idea. Past specifics, not future hypotheticals. Compliments are not data.',
+}
+
+// Section headers that group questions inside a stage (canon 03).
+const SECTIONS = {
+  's2-p1': 'The Fellowship — People Over Idea (PIE: People 5× / Idea 2× / Enchantment 1.5×)',
+  's6-u1': 'The Unseen — Ethical Impact',
+}
+
+// Every question, in stage order. type === 'prose' is the default free-text input.
+const QUESTIONS = [
+  // ── Stage 1 · The Problem ──────────────────────────────────────────────
+  { id: 's1-th', stageId: 's1', type: 'story', text: 'Tell the last time you watched someone hit this problem. Who were they — name them — where were they, and what did they do next?', hint: 'A story — one real moment. Who, where, and what they did next.' },
+  { id: 's1-l1', stageId: 's1', type: 'names', text: "Who exactly has this problem? Three real people or organizations. No personas, no 'busy professionals.'", hint: 'Three names — real people or organizations.' },
+  { id: 's1-l2', stageId: 's1', type: 'fivewhys', text: 'Why is that a problem for them?', hint: 'Five whys, each digging under the last, to a root you can see.' },
+  { id: 's1-l3', stageId: 's1', type: 'number', text: 'What does one occurrence cost — in minutes, dollars, or dignity? How often does it happen?', hint: 'A number — minutes, dollars, or dignity — and how often.' },
+  { id: 's1-l4', stageId: 's1', type: 'list', text: 'What do they do about it today? The workaround is your first competitor.', hint: 'A list — the workarounds they use today.' },
+  { id: 's1-l5', stageId: 's1', type: 'story', text: 'Why you? What have you lived, seen, or built that makes this problem yours to carry?', hint: 'A story — what makes this yours to carry.' },
+  { id: 's1-fp', stageId: 's1', type: 'quickadd', text: 'Strip it bare. List only what you know from direct observation — not reports, not belief. Everything else goes to the Assumption Registry.', hint: 'Only what you saw directly. An "This only works if ___" line becomes a guardian.' },
+  { id: 's1-fx', stageId: 's1', type: 'falsify', text: "If this problem weren't worth solving, what would the world look like? Do you see any of that?", hint: 'Describe that world — then say honestly if you see any of it.' },
+
+  // ── Stage 2 · Research ─────────────────────────────────────────────────
+  { id: 's2-th', stageId: 's2', type: 'verbatim', text: 'Ask five people living this problem about the last time it happened — not whether they would use your idea. Paste what they said, word for word.', hint: 'Their words, verbatim — the last time it happened, not a hypothetical.' },
+  { id: 's2-l1', stageId: 's2', type: 'prose', text: "What's their current 'good enough' — the spreadsheet, the cousin, the doing-nothing? What does keeping it cost them?", hint: "Their 'good enough' today, and what it costs them." },
+  { id: 's2-l2', stageId: 's2', type: 'prose', text: "What did you hear that you didn't want to hear? Log that first.", hint: "The thing you didn't want to hear. Log it first." },
+  { id: 's2-l3', stageId: 's2', type: 'names', text: 'Who profits from this problem existing? Who loses if it is solved?', hint: 'Names — who profits, who loses.' },
+  { id: 's2-l4', stageId: 's2', type: 'prose', text: 'Name the one external shift — a rule, a platform policy, a price, a technology — that could make this venture pointless or impossible within two years. How likely is it?', hint: 'One external shift that could end this — and how likely.' },
+  { id: 's2-l5', stageId: 's2', type: 'prose', text: "Who has walked this exact terrain? What's the one question you'd ask them — and have you sent it?", hint: 'Experience over expertise — a veteran of the current workaround counts. Have you sent it?' },
+  { id: 's2-p1', stageId: 's2', type: 'story', text: 'When did you last change your mind because someone pushed back? What did it cost you?', hint: 'A story — the last time you changed your mind, and its cost.' },
+  { id: 's2-p2', stageId: 's2', type: 'story', text: "What's the disagreement you and your cofounder keep not having? Have it — then write what each of you actually said. (Solo? Argue with the voice that disagrees, and transcribe.)", hint: 'What each of you actually said.' },
+  { id: 's2-p3', stageId: 's2', type: 'names', text: 'Who — besides you — is illogically enchanted by this? Name them. If no one, log that in the ledger too.', hint: 'Names — who else is enchanted. None? Log that.' },
+  { id: 's2-p4', stageId: 's2', type: 'list', text: 'What are you bringing that helps everyone else succeed — before anyone helps you?', hint: 'A list — what you bring that helps others first.' },
+  { id: 's2-fx', stageId: 's2', type: 'falsify', text: 'What pattern across your five conversations would tell you this problem is real but not urgent? Do you see it?', hint: 'The pattern that means real-but-not-urgent — and whether you see it.' },
+
+  // ── Stage 3 · Prototyping (the Vault unseals) ──────────────────────────
+  { id: 's3-th', stageId: 's3', type: 'prose', text: "Write your customer's sentence in their words from your ledger: 'When I [situation], I want to [motivation], so I can [outcome].'", hint: 'One sentence in their words: When I…, I want to…, so I can…' },
+  { id: 's3-l1', stageId: 's3', type: 'vault', text: 'Open the Vault. Which captured idea attacks the root cause from your Five Whys — not a symptom of it?', hint: 'Pick the captured idea that hits the root, not a symptom.' },
+  { id: 's3-l2', stageId: 's3', type: 'ifthen', text: 'State the logic before you build: IF ___ / THEN when [named segment] meets [prototype], we will observe [behavior] / WITHIN [days].', hint: 'IF … / THEN when [segment] meets [prototype] we will observe [behavior] / WITHIN [days].' },
+  { id: 's3-l3', stageId: 's3', type: 'prose', text: "What's the smallest thing you can put in front of a real customer in 7 days that lets them answer with behavior — a sketch, a fake door, a concierge run you do by hand?", hint: 'The smallest thing a real customer can react to in 7 days.' },
+  { id: 's3-l4', stageId: 's3', type: 'list', text: "Which features are for the customer, and which are for your ego? Write the second list — that's what goes into the flames.", hint: 'A list — the features that serve your ego.' },
+  { id: 's3-l5', stageId: 's3', type: 'prose', text: 'Am I building to learn, or building to be admired?', hint: 'Answer honestly — learn, or be admired?' },
+  { id: 's3-joy', stageId: 's3', type: 'prose', text: 'Beyond killing the pain — what one moment could make them smile and tell a friend? Name the moment. Design it on purpose.', hint: 'Name one moment worth telling a friend about. Design it.', badge: 'The Spark of Joy' },
+
+  // ── Stage 4 · Testing ──────────────────────────────────────────────────
+  { id: 's4-th', stageId: 's4', type: 'seal', text: "Before anything runs: write the result that makes you stop or pivot. Seal it. This is Ariadne's Thread.", hint: 'The result that makes you stop or pivot — sealed and timestamped before the test runs.' },
+  { id: 's4-l1', stageId: 's4', type: 'prose', text: 'What behavior are you measuring — not opinions you are collecting? Clicks, sign-ups, prepayments, returns, time-on-task.', hint: 'A behavior you can measure — not an opinion you collect.' },
+  { id: 's4-l2', stageId: 's4', type: 'prose', text: 'What does a costly yes look like — money, a deposit, a calendar hold, an intro to their boss? Compliments are not currency.', hint: 'What a costly yes looks like — money, a deposit, a calendar hold.' },
+  { id: 's4-l3', stageId: 's4', type: 'story', text: 'Where did testers get lost — and what did they do in the ten seconds before quitting?', hint: 'A story — where they got lost, and the ten seconds before quitting.' },
+  { id: 's4-l4', stageId: 's4', type: 'falsify', text: "If the test 'succeeds', what's the strongest boring explanation — novelty, politeness, the wrong crowd? How do you rule it out?", hint: 'The most boring explanation for success — and how you rule it out.' },
+  { id: 's4-l5', stageId: 's4', type: 'prose', text: "What's the smallest step you can take today?", hint: 'The smallest step you can take today.' },
+
+  // ── Stage 5 · Feedback ─────────────────────────────────────────────────
+  { id: 's5-th', stageId: 's5', type: 'verdict', text: "Open the seal. Did Ariadne's Thread trigger — yes or no? Answer before you interpret anything else.", hint: 'Yes or no — did the sealed result trigger? Answer before interpreting.' },
+  { id: 's5-l1', stageId: 's5', type: 'prose', text: 'What uncomfortable truths is the mirror showing me?', hint: 'What the mirror is showing you.' },
+  { id: 's5-l2', stageId: 's5', type: 'prose', text: 'Am I listening to the market, or protecting my own ego?', hint: 'Listening to the market, or protecting your ego?' },
+  { id: 's5-l3', stageId: 's5', type: 'prose', text: 'What is the gap between my intention and their perception?', hint: 'The gap between your intention and their perception.' },
+  { id: 's5-l4', stageId: 's5', type: 'prose', text: 'Take the most inconvenient entry in your ledger and argue its case like you are its lawyer. What if it is right?', hint: "Argue the most inconvenient entry's case, as its lawyer." },
+  { id: 's5-l5', stageId: 's5', type: 'registry', text: 'Which Stage-1 belief is now dead? Hold the funeral: mark it invalidated in the Registry — and take the XP.', hint: 'Mark the dead belief invalidated in the Registry — take the XP.' },
+  { id: 's5-dec', stageId: 's5', type: 'decision', text: 'Pivot, or persevere? Cite the evidence that decides it.', hint: 'Pivot or persevere — locked until cited to at least one ledger entry.' },
+
+  // ── Stage 6 · Refinement ───────────────────────────────────────────────
+  { id: 's6-th', stageId: 's6', type: 'prose', text: 'What do users actually do with it, versus what you built it for? Cut everything serving only the second.', hint: 'What users actually do vs. what you built for. Cut the rest.' },
+  { id: 's6-l1', stageId: 's6', type: 'number', text: 'What one action must a new user complete to feel the value? Count the steps, seconds, and decisions standing in the way.', hint: 'The one activation action — count its steps, seconds, decisions.' },
+  { id: 's6-l2', stageId: 's6', type: 'prose', text: 'If you fix one thing this week, what does the evidence — not your taste — say it is?', hint: 'The one fix the evidence points to.' },
+  { id: 's6-u1', stageId: 's6', type: 'names', text: 'Who is affected but not in the room? Name them. What would they say if they read your plan?', hint: "Names — who's affected but not in the room, and what they'd say." },
+  { id: 's6-u2', stageId: 's6', type: 'prose', text: 'How would a bad actor use this exactly as designed? What is the cheapest guardrail, built now while it is cheap?', hint: "A bad actor's use, and the cheapest guardrail now." },
+  { id: 's6-u3', stageId: 's6', type: 'prose', text: 'What behavior does your revenue model reward at scale? Are you at peace with what it optimizes?', hint: 'What your revenue model rewards at scale.' },
+  { id: 's6-u4', stageId: 's6', type: 'prose', text: 'Whose data do you touch — and what is the least of it you can hold?', hint: 'The least data you can hold.' },
+
+  // ── Stage 7 · Implementation ───────────────────────────────────────────
+  { id: 's7-th', stageId: 's7', type: 'number', text: 'Walk one customer across the bridge — one month, real figures. What do they pay, what does serving them cost, what remains? Any number you do not know is an assumption: register it.', hint: 'Real figures — one customer, one month: pay, cost, remainder. Unknowns become guardians.' },
+  { id: 's7-l1', stageId: 's7', type: 'prose', text: 'Has anyone paid, pre-paid, or given up something costly — time, data, a deposit, an introduction? What is the closest thing to money you have collected?', hint: "The closest thing to money you've actually collected." },
+  { id: 's7-l2', stageId: 's7', type: 'prose', text: 'Which single plank — a person, a platform, a supplier, an API — drops the whole bridge if it snaps? What is your 30-day plan if it snaps tomorrow?', hint: 'The single plank that drops the bridge — and your 30-day plan.' },
+  { id: 's7-l3', stageId: 's7', type: 'names', text: 'Who is crossing with you — and what commitment has each actually made, out loud?', hint: "Names — who's crossing, and the commitment each made out loud." },
+  { id: 's7-l4', stageId: 's7', type: 'list', text: 'If revenue halves for two quarters, what goes first, second, third? Decide while you are calm.', hint: 'A list — what goes first, second, third if revenue halves.' },
+  { id: 's7-l5', stageId: 's7', type: 'list', text: 'What are you deliberately not doing? Strategy is sacrifice — name three.', hint: "Three things you're deliberately not doing." },
+
+  // ── Stage 8 · Launch ───────────────────────────────────────────────────
+  { id: 's8-th', stageId: 's8', type: 'spine', text: "The elixir is the story. Tell it with your customer as the hero and you as the guide: 'Once there was [named customer]. Every day, [struggle]. Until one day, [your work]. Because of that, [observed outcome]. Until finally, [transformation].' Every beat cites evidence, or it does not cast.", hint: 'Five beats, each cited to evidence, or the spine renders unproven.' },
+  { id: 's8-l1', stageId: 's8', type: 'number', text: "One number tells you it is flying. Which one, why that one, and what is this month's honest target?", hint: "The one number, why it, and this month's honest target." },
+  { id: 's8-l2', stageId: 's8', type: 'story', text: 'What did this journey disprove that you believed at the start? Write it for the next founder — that is the wisdom you return with.', hint: 'What the journey disproved — the wisdom for the next founder.' },
+  { id: 's8-l3', stageId: 's8', type: 'prose', text: 'How will I celebrate crossing the final threshold?', hint: "How you'll celebrate crossing the threshold.", badge: 'Joy — survives every rewrite' },
+  { id: 's8-l4', stageId: 's8', type: 'prose', text: 'Are you ready to let go and let it fly?', hint: 'Answer honestly — ready to let it fly?' },
+]
+
+// Milestones per stage (canon 03, verbatim). Action = checked / total; self-reported.
+const MILESTONES = {
+  s1: ['story with a named person', 'three real people named', 'Five-Whys root reached'],
+  s2: ['five E2+ conversations', 'one E3/E4 entry', 'riskiest guardian with kill criterion'],
+  s3: ['JTBD in their words', 'IF-THEN stated before building', '7-day artifact chosen'],
+  s4: ['thread sealed before testing', 'behavior metric defined', 'test run with real users'],
+  s5: ['verdict recorded', 'one funeral held', 'decision cited to evidence'],
+  s6: ['cuts from observed use', 'time-to-value counted', 'one guardrail named'],
+  s7: ['unit walk-through written', 'SPOF + 30-day plan', 'three deliberate nots'],
+  s8: ['spine cast from cited evidence', 'one honest number and target', 'wisdom for the next founder'],
+}
+const MILESTONE_TOTAL = Object.values(MILESTONES).reduce((n, arr) => n + arr.length, 0)
+
+// The Vault trigger-word list — operator-approved. Case-insensitive, word-boundary;
+// active only in Act I (Stages 1–2), sealed until Stage 3.
+const VAULT_TRIGGERS = [
+  'app', 'platform', 'feature', 'ai', 'build', 'tool', 'saas', 'software',
+  'product', 'dashboard', 'algorithm', 'automate', 'automation', 'api',
+  'chatbot', 'plugin', 'mvp', 'prototype', 'website', 'mobile app', 'machine learning',
+]
+const VAULT_RE = new RegExp(
+  '\\b(' + VAULT_TRIGGERS.map((w) => w.replace(/ /g, '\\s+')).join('|') + ')\\b',
+  'i',
+)
 
 /* ── data model ───────────────────────────────────────────────────────── */
 const DATA_KEY = 'founders-quest:v3'
@@ -421,25 +536,303 @@ function StorageBanner() {
   )
 }
 
-/* ── app root (Stages D–G build on this) ─────────────────────────────── */
-export default function App() {
-  const { data, persistent } = useQuestData()
+/* ═══ Stage D1: the instrument shell ═════════════════════════════════════
+   Stage navigation (gates warn, never block — every stage is reachable),
+   typed question inputs, field notes, self-reported milestones, and the
+   Act-I Vault capture-nudge. Registry/Ledger/Gates/Vault-seal/Thread and
+   the Council layer on in D2–D4 / E–F. */
+const uid = (p) => p + Math.random().toString(36).slice(2, 9)
+
+const PLACEHOLDER = {
+  prose: 'Write plainly.',
+  story: 'Tell it as it happened…',
+  names: 'One per line — real names, no personas.',
+  number: 'A number — and how often.',
+  list: 'One per line.',
+  verbatim: 'Paste their exact words…',
+  falsify: 'Be honest about what you actually see.',
+}
+
+// Special types still awaiting their mechanic (arrive in D2–D4). Text is saved now.
+const PENDING_MECHANIC = {
+  seal: "Ariadne's Thread",
+  verdict: 'the verdict seal',
+  vault: 'the Vault picker',
+  registry: 'the Registry funeral',
+  decision: 'the evidence-locked decision',
+  spine: 'the evidence-locked Story Forge',
+  quickadd: 'quick-add guardians',
+}
+
+function useInstrument() {
+  const q = useQuestData()
+  const { setData } = q
+  const patchAnswer = (stageId, qid, patch) =>
+    setData((d) => ({
+      ...d,
+      answers: {
+        ...d.answers,
+        [stageId]: {
+          ...(d.answers[stageId] || {}),
+          [qid]: { ...((d.answers[stageId] || {})[qid] || {}), ...patch },
+        },
+      },
+    }))
+  const setFieldNote = (stageId, text) =>
+    setData((d) => ({ ...d, fieldNotes: { ...d.fieldNotes, [stageId]: text } }))
+  const toggleMilestone = (id) =>
+    setData((d) => ({ ...d, milestones: { ...d.milestones, [id]: !d.milestones[id] } }))
+  const captureVault = (text) =>
+    setData((d) => ({
+      ...d,
+      vault: [...d.vault, { id: uid('v'), text, date: new Date().toISOString() }],
+    }))
+  return { ...q, patchAnswer, setFieldNote, toggleMilestone, captureVault }
+}
+
+function Bar({ label, pct, sub }) {
+  return (
+    <div className="flex-1 min-w-[110px]">
+      <div className="flex justify-between text-2xs uppercase tracking-wider text-neutral-400">
+        <span>{label}</span>
+        <span>{sub}</span>
+      </div>
+      <div className="mt-1 h-1.5 rounded bg-neutral-800 overflow-hidden">
+        <div className="h-full bg-neutral-300 transition-all" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function ProgressHeader({ data }) {
   const truth = computeTruth(data)
+  const done = Object.values(data.milestones).filter(Boolean).length
+  return (
+    <header className="sticky top-0 z-modal bg-neutral-950/90 backdrop-blur border-b border-neutral-800 px-4 py-3">
+      <div className="max-w-3xl mx-auto flex items-center gap-4">
+        <div className="text-sm font-semibold tracking-tight whitespace-nowrap">Founder's Quest</div>
+        <Bar label="Truth" pct={truth == null ? 0 : truth * 100} sub={fmtPct(truth)} />
+        <Bar label="Action" pct={MILESTONE_TOTAL ? (done / MILESTONE_TOTAL) * 100 : 0} sub={`${done}/${MILESTONE_TOTAL}`} />
+        <div className="text-2xs uppercase tracking-wider text-neutral-400 whitespace-nowrap">XP {computeXP(data)}</div>
+      </div>
+    </header>
+  )
+}
+
+function StageRail({ current, setCurrent, data }) {
+  return (
+    <nav className="max-w-3xl mx-auto px-4 py-3 flex gap-1 overflow-x-auto">
+      {STAGES.map((s) => {
+        const answered = data.answers[s.id] && Object.keys(data.answers[s.id]).length
+        const active = s.id === current
+        return (
+          <button
+            key={s.id}
+            onClick={() => setCurrent(s.id)}
+            className={
+              'shrink-0 rounded px-2.5 py-1.5 text-left transition ' +
+              (active ? 'bg-neutral-100 text-neutral-900' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800')
+            }
+          >
+            <div className="text-2xs uppercase tracking-wider opacity-70">Stage {s.n}{answered ? ' ·' : ''}</div>
+            <div className="text-xs font-medium whitespace-nowrap">{s.name}</div>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+function ProseInput({ value, onChange, placeholder, rows = 3 }) {
+  return (
+    <textarea
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className="w-full mt-2 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2.5 text-sm text-neutral-100 placeholder:text-neutral-600 resize-y"
+    />
+  )
+}
+
+function FiveWhysInput({ whys, onChange }) {
+  const arr = whys && whys.length ? whys : ['']
+  const set = (i, v) => {
+    const next = [...arr]
+    next[i] = v
+    onChange(next)
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      {arr.map((w, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <span className="text-2xs text-neutral-500 mt-2 w-12 shrink-0">why {i + 1}</span>
+          <input
+            value={w}
+            onChange={(e) => set(i, e.target.value)}
+            placeholder={i === 0 ? 'Because…' : 'And why is that?'}
+            className="flex-1 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm"
+          />
+        </div>
+      ))}
+      {arr.length < 5 && (
+        <button onClick={() => onChange([...arr, ''])} className="text-xs text-neutral-400 hover:text-neutral-200">
+          + dig one why deeper
+        </button>
+      )}
+    </div>
+  )
+}
+
+function IfThenInput({ answer, onPatch }) {
+  const field = 'w-full mt-1 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm'
+  return (
+    <div className="mt-2 space-y-2">
+      <label className="block">
+        <span className="text-2xs uppercase tracking-wider text-neutral-500">IF</span>
+        <input value={answer.ifPart || ''} onChange={(e) => onPatch({ ifPart: e.target.value })} placeholder="the condition you're betting on" className={field} />
+      </label>
+      <label className="block">
+        <span className="text-2xs uppercase tracking-wider text-neutral-500">THEN when [segment] meets [prototype], we will observe</span>
+        <input value={answer.thenPart || ''} onChange={(e) => onPatch({ thenPart: e.target.value })} placeholder="the behavior you'll see" className={field} />
+      </label>
+      <label className="block w-40">
+        <span className="text-2xs uppercase tracking-wider text-neutral-500">WITHIN (days)</span>
+        <input type="number" min="1" value={answer.withinDays || ''} onChange={(e) => onPatch({ withinDays: e.target.value })} className={field} />
+      </label>
+    </div>
+  )
+}
+
+// Gentle nudge in Act I: solution language → capture to the Vault, return to the problem.
+function VaultNudge({ text, onCapture }) {
+  const [captured, setCaptured] = useState(false)
+  const m = text && text.match(VAULT_RE)
+  if (captured) return <p className="mt-1.5 text-2xs text-emerald-400">Captured to the Vault. Now — back to the problem.</p>
+  if (!m) return null
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-2xs text-amber-300">
+      <span>That sounds like a solution ("{m[0]}"). This stage is about the problem — seal the idea for later.</span>
+      <button
+        onClick={() => { onCapture(text); setCaptured(true) }}
+        className="rounded bg-amber-900/60 px-2 py-0.5 text-amber-100 hover:bg-amber-900"
+      >
+        Capture to Vault
+      </button>
+    </div>
+  )
+}
+
+function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault }) {
+  const text = answer.text || ''
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+      {q.badge && <div className="text-2xs uppercase tracking-widest text-amber-300 mb-1">✦ {q.badge}</div>}
+      <p className="text-sm text-neutral-100">{q.text}</p>
+      <p className="text-2xs text-neutral-500 mt-1">{q.hint}</p>
+
+      {q.type === 'fivewhys' ? (
+        <FiveWhysInput whys={answer.whys} onChange={(whys) => onPatch({ whys })} />
+      ) : q.type === 'ifthen' ? (
+        <IfThenInput answer={answer} onPatch={onPatch} />
+      ) : (
+        <>
+          <ProseInput value={text} onChange={(v) => onPatch({ text: v })} placeholder={PLACEHOLDER[q.type] || 'Write plainly.'} />
+          {isActI && <VaultNudge text={text} onCapture={onCaptureVault} />}
+          {PENDING_MECHANIC[q.type] && (
+            <p className="mt-1.5 text-2xs text-neutral-500 italic">
+              Full {PENDING_MECHANIC[q.type]} lands in the next slice — your words are saved.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function StageView({ stageId, data, mut }) {
+  const stage = STAGES.find((s) => s.id === stageId)
+  const qs = QUESTIONS.filter((q) => q.stageId === stageId)
+  const answers = data.answers[stageId] || {}
+  const isActI = stage.act === 1
+  return (
+    <section className="max-w-3xl mx-auto px-4 pb-24">
+      <div className="pt-4 pb-3">
+        <div className="text-2xs uppercase tracking-[0.2em] text-neutral-500">
+          Stage {stage.n} · {stage.myth} · {stage.symbol}
+        </div>
+        <h2 className="text-xl font-semibold tracking-tight text-neutral-100">{stage.name}</h2>
+      </div>
+
+      {STAGE_BANNERS[stageId] && (
+        <div className="mb-4 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
+          {STAGE_BANNERS[stageId]}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {qs.map((q) => (
+          <React.Fragment key={q.id}>
+            {SECTIONS[q.id] && (
+              <h3 className="pt-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">{SECTIONS[q.id]}</h3>
+            )}
+            <QuestionCard
+              q={q}
+              answer={answers[q.id] || {}}
+              onPatch={(patch) => mut.patchAnswer(stageId, q.id, patch)}
+              isActI={isActI}
+              onCaptureVault={mut.captureVault}
+            />
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Field notes</h3>
+        <ProseInput
+          value={data.fieldNotes[stageId] || ''}
+          onChange={(v) => mut.setFieldNote(stageId, v)}
+          placeholder="Anything else worth recording for this stage."
+        />
+      </div>
+
+      <div className="mt-6">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+          Milestones <span className="text-neutral-600">· self-reported</span>
+        </h3>
+        <div className="mt-2 space-y-1.5">
+          {(MILESTONES[stageId] || []).map((label, i) => {
+            const id = `${stageId}-m${i}`
+            const on = !!data.milestones[id]
+            return (
+              <button key={id} onClick={() => mut.toggleMilestone(id)} className="flex items-center gap-2 text-sm text-left">
+                <span className={'flex h-4 w-4 items-center justify-center rounded border ' + (on ? 'bg-neutral-100 border-neutral-100 text-neutral-900' : 'border-neutral-600')}>
+                  {on && <Check size={12} strokeWidth={3} />}
+                </span>
+                <span className={on ? 'text-neutral-200' : 'text-neutral-400'}>{label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ── app root ─────────────────────────────────────────────────────────── */
+export default function App() {
+  const mut = useInstrument()
+  const { data, persistent } = mut
+  const [current, setCurrent] = useState('s1')
   return (
     <>
       <QuestStyles />
       {!persistent && <StorageBanner />}
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-6">
-        <div className="max-w-md text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Founder's Quest</h1>
-          <p className="mt-3 text-neutral-400">
-            Progress is validated learning, not completed checkboxes.
-          </p>
-          <p className="mt-6 text-2xs uppercase tracking-[0.2em] text-neutral-600">
-            Truth {fmtPct(truth)} · {data.assumptions.length} guardians · {data.evidence.length} ledger entries
-          </p>
-        </div>
-      </main>
+      <div className="min-h-screen bg-neutral-950 text-neutral-100">
+        <ProgressHeader data={data} />
+        <StageRail current={current} setCurrent={setCurrent} data={data} />
+        <StageView stageId={current} data={data} mut={mut} />
+      </div>
     </>
   )
 }
