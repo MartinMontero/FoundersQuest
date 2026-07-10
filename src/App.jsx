@@ -543,6 +543,18 @@ function StorageBanner() {
    the Council layer on in D2–D4 / E–F. */
 const uid = (p) => p + Math.random().toString(36).slice(2, 9)
 const nowISO = () => new Date().toISOString()
+const todayKey = () => nowISO().slice(0, 10)
+
+// Plain browser download (no interstitial) — used by Journal/Brief/Dinner exports.
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const PLACEHOLDER = {
   prose: 'Write plainly.',
@@ -666,6 +678,44 @@ function useInstrument() {
       gates: { ...d.gates, [gateId]: { status: 'overridden', reason, date: nowISO() } },
       trail: [...d.trail, { type: 'gate-override', name, date: nowISO() }],
     }))
+  // ── Weather · Side Quests · Loops · Family Dinner (Stage D4) ──
+  const setWeather = (value) =>
+    setData((d) => {
+      const today = todayKey()
+      if (d.weather.some((w) => d10(w.date) === today)) {
+        return { ...d, weather: d.weather.map((w) => (d10(w.date) === today ? { ...w, value } : w)) }
+      }
+      return { ...d, weather: [...d.weather, { id: uid('w'), date: nowISO(), value }] }
+    })
+  const startSideQuest = (id) =>
+    setData((d) => (d.sideQuests[id] ? d : { ...d, sideQuests: { ...d.sideQuests, [id]: { text: '', startedAt: nowISO(), completedAt: null } } }))
+  const setSideQuestText = (id, text) =>
+    setData((d) => ({ ...d, sideQuests: { ...d.sideQuests, [id]: { ...(d.sideQuests[id] || { startedAt: nowISO(), completedAt: null }), text } } }))
+  const completeSideQuest = (id) =>
+    setData((d) => ({ ...d, sideQuests: { ...d.sideQuests, [id]: { ...(d.sideQuests[id] || { text: '', startedAt: nowISO() }), completedAt: nowISO() } } }))
+  const recordLoop = (loop) =>
+    setData((d) => ({
+      ...d,
+      lastLoop: loop.name,
+      trail: [...d.trail, { type: 'loop', name: loop.name, fromId: loop.fromId, toId: loop.toId, learning: loop.learning, critique: loop.critique || null, date: nowISO() }],
+    }))
+  const setDinnerCard = (text) => setData((d) => ({ ...d, dinnerCard: { text, updatedAt: nowISO() } }))
+  const startDinner = () => setData((d) => ({ ...d, dinnerSession: { date: nowISO(), cards: [], timer: 90 * 60 } }))
+  const addDinnerCard = (card) =>
+    setData((d) =>
+      d.dinnerSession
+        ? { ...d, dinnerSession: { ...d.dinnerSession, cards: [...d.dinnerSession.cards, { id: uid('dc'), name: card.name || '', text: card.text || '', bucket: card.bucket || '', match: '', spoke: false }] } }
+        : d,
+    )
+  const updateDinnerCard = (id, patch) =>
+    setData((d) => (d.dinnerSession ? { ...d, dinnerSession: { ...d.dinnerSession, cards: d.dinnerSession.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)) } } : d))
+  const endDinner = () =>
+    setData((d) => {
+      if (!d.dinnerSession) return d
+      const s = d.dinnerSession
+      const entry = { date: s.date, cards: s.cards.length, spoke: s.cards.filter((c) => c.spoke).length, matches: s.cards.filter((c) => c.bucket === 'Been there').length }
+      return { ...d, dinnerSession: null, dinnerLog: [...d.dinnerLog, entry] }
+    })
   return {
     ...q,
     patchAnswer,
@@ -684,6 +734,16 @@ function useInstrument() {
     setVerdict,
     passGate,
     overrideGate,
+    setWeather,
+    startSideQuest,
+    setSideQuestText,
+    completeSideQuest,
+    recordLoop,
+    setDinnerCard,
+    startDinner,
+    addDinnerCard,
+    updateDinnerCard,
+    endDinner,
   }
 }
 
@@ -706,11 +766,15 @@ function ProgressHeader({ data }) {
   const done = Object.values(data.milestones).filter(Boolean).length
   return (
     <header className="sticky top-0 z-modal bg-neutral-950/90 backdrop-blur border-b border-neutral-800 px-4 py-3">
-      <div className="max-w-3xl mx-auto flex items-center gap-4">
+      <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="text-sm font-semibold tracking-tight whitespace-nowrap">Founder's Quest</div>
         <Bar label="Truth" pct={truth == null ? 0 : truth * 100} sub={fmtPct(truth)} />
         <Bar label="Action" pct={MILESTONE_TOTAL ? (done / MILESTONE_TOTAL) * 100 : 0} sub={`${done}/${MILESTONE_TOTAL}`} />
         <div className="text-2xs uppercase tracking-wider text-neutral-400 whitespace-nowrap">XP {computeXP(data)}</div>
+        <div className="flex gap-1">
+          <button onClick={() => downloadText('founders-quest-journal.md', buildJournalMd(data, 'full'))} className="rounded border border-neutral-700 px-2 py-1 text-2xs text-neutral-300 hover:border-neutral-500">↓ Journal</button>
+          <button onClick={() => downloadText('founders-quest-brief.md', buildBriefMd(data))} className="rounded border border-neutral-700 px-2 py-1 text-2xs text-neutral-300 hover:border-neutral-500">↓ Brief</button>
+        </div>
       </div>
     </header>
   )
@@ -1130,12 +1194,12 @@ function LedgerView({ data, mut }) {
 
 function ViewTabs({ view, setView, tabs }) {
   return (
-    <nav className="max-w-3xl mx-auto flex gap-1 px-4 pt-3">
+    <nav className="max-w-3xl mx-auto flex gap-1 overflow-x-auto px-4 pt-3">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => setView(t.id)}
-          className={'rounded-t px-3 py-1.5 text-xs font-medium ' + (view === t.id ? 'bg-neutral-900 text-neutral-100 border-b-2 border-neutral-100' : 'text-neutral-400 hover:text-neutral-200')}
+          className={'shrink-0 whitespace-nowrap rounded-t px-3 py-1.5 text-xs font-medium ' + (view === t.id ? 'bg-neutral-900 text-neutral-100 border-b-2 border-neutral-100' : 'text-neutral-400 hover:text-neutral-200')}
         >
           {t.label}
         </button>
@@ -1464,12 +1528,267 @@ function GatePanel({ gateId, data, mut }) {
   )
 }
 
+/* ═══ Stage D4: Weather · Side Quests · Loops · Family Dinner ═════════════ */
+const WEATHER = [
+  { v: 1, name: 'Storm' },
+  { v: 2, name: 'Rain' },
+  { v: 3, name: 'Grey' },
+  { v: 4, name: 'Breaks' },
+  { v: 5, name: 'Clear' },
+]
+const SIDE_QUESTS = [
+  { id: 'q404', name: 'The 404', desc: 'For 24 hours, define the product only by what it is NOT. List what you refuse to be.' },
+  { id: 'obituary', name: 'The Obituary', desc: "It died. Write the venture's obituary — each cause of death becomes a guardian." },
+  { id: 'fanletter', name: 'The Fan Letter', desc: "Write the fan letter you'd want from a real customer — using only what's in your ledger." },
+  { id: 'swap', name: 'The Swap', desc: "Paste another founder's Brief. Read it as its lawyer, then as its Shadow." },
+]
+const LOOPS = [
+  { name: 'The Reality Check', fromId: 's5', toId: 's1', desc: 'Feedback back to the Problem — the market disagreed; go re-see it.' },
+  { name: 'The Re-Build', fromId: 's7', toId: 's3', desc: 'Implementation back to Prototyping — the bridge needs a different span.' },
+  { name: 'The Reset', fromId: 's8', toId: 's1', desc: 'Launch back to the Problem — begin again, wiser. Adds a cycle retro and an undefended critique.' },
+]
+const DINNER_BUCKETS = ['Been there', "Now that's interesting", 'Do not pass Go']
+
+// The facilitator's explicit, in-panel dinner export — the ONLY path dinner
+// data is serialized (never via buildJournalMd). Canon 02/05.
+function dinnerToMd(s) {
+  const L = ['# Family Dinner — facilitator notes', '', `Date: ${d10(s.date)}`, `Spoke: ${s.cards.filter((c) => c.spoke).length}/${s.cards.length}`, '']
+  for (const c of s.cards) L.push(`- ${c.name} [${c.bucket}]${c.spoke ? ' · spoke' : ''}${c.text ? `: ${c.text}` : ''}`)
+  return L.join('\n') + '\n'
+}
+
+function WeatherCheckin({ data, mut }) {
+  const today = data.weather.find((w) => d10(w.date) === todayKey())
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+      <h3 className="text-sm font-semibold text-neutral-100">Today's weather</h3>
+      <p className="text-2xs text-neutral-500">One tap, once a day. Yours alone — it sets the Council's cadence.</p>
+      <div className="mt-2 flex gap-1.5">
+        {WEATHER.map((w) => (
+          <button
+            key={w.v}
+            onClick={() => mut.setWeather(w.v)}
+            className={'flex-1 rounded border px-2 py-2 text-center text-2xs ' + (today && today.value === w.v ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}
+          >
+            <div className="text-base font-semibold">{w.v}</div>
+            {w.name}
+          </button>
+        ))}
+      </div>
+      {today && <p className="mt-2 text-2xs text-neutral-400">Logged today: {WEATHER[today.value - 1].name}.</p>}
+    </div>
+  )
+}
+
+function TroughBanner() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 pt-3">
+      <div className="rounded border border-sky-800 bg-sky-950/40 px-3 py-2 text-xs text-sky-200">
+        This stretch is on the map — the mid-journey winter. It's the trough, not your failure. The Shadow holds its fire. Try a Side Quest, or just log the weather and rest.
+      </div>
+    </div>
+  )
+}
+
+function SideQuestCard({ q, state, mut }) {
+  const done = !!(state && state.completedAt)
+  return (
+    <div className={'rounded-lg border p-3 ' + (done ? 'border-emerald-800 bg-emerald-950/20' : 'border-neutral-800 bg-neutral-900/40')}>
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-neutral-100">{q.name}</h4>
+        <span className="text-2xs text-neutral-500">+5 XP</span>
+      </div>
+      <p className="mt-1 text-2xs text-neutral-400">{q.desc}</p>
+      {!state ? (
+        <button onClick={() => mut.startSideQuest(q.id)} className="mt-2 rounded bg-neutral-800 px-2.5 py-1 text-xs text-neutral-100 hover:bg-neutral-700">Start</button>
+      ) : (
+        <>
+          <textarea value={state.text || ''} onChange={(e) => mut.setSideQuestText(q.id, e.target.value)} placeholder="Your work here." rows={2} className={fieldCls + ' mt-2'} />
+          {q.id === 'obituary' && <QuickAddGuardianInline onAdd={mut.addGuardian} originStageId={null} placeholder="A cause of death → guardian…" />}
+          {done ? (
+            <p className="mt-2 text-2xs text-emerald-400">Completed {d10(state.completedAt)} · +5 XP</p>
+          ) : (
+            <button onClick={() => mut.completeSideQuest(q.id)} className={primaryBtn + ' mt-2'}>Complete (+5 XP)</button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function LoopCard({ loop, mut }) {
+  const [learning, setLearning] = useState('')
+  const [retro, setRetro] = useState('')
+  const [critique, setCritique] = useState('')
+  const isReset = loop.name === 'The Reset'
+  const canRecord = learning.trim() && (!isReset || (retro.trim() && critique.trim()))
+  const record = () => {
+    if (!canRecord) return
+    mut.recordLoop({
+      name: loop.name,
+      fromId: loop.fromId,
+      toId: loop.toId,
+      learning: learning.trim(),
+      critique: isReset ? `retro: ${retro.trim()} · critique: ${critique.trim()}` : null,
+    })
+    setLearning('')
+    setRetro('')
+    setCritique('')
+  }
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+      <h4 className="text-sm font-medium text-neutral-100">
+        {loop.name} <span className="text-2xs text-neutral-500">Stage {loop.fromId.slice(1)} → {loop.toId.slice(1)}</span>
+      </h4>
+      <p className="mt-1 text-2xs text-neutral-400">{loop.desc}</p>
+      <input value={learning} onChange={(e) => setLearning(e.target.value)} placeholder="One learning line — required." className={fieldCls + ' mt-2'} />
+      {isReset && (
+        <>
+          <input value={retro} onChange={(e) => setRetro(e.target.value)} placeholder="Cycle retro — what this cycle taught you." className={fieldCls + ' mt-2'} />
+          <input value={critique} onChange={(e) => setCritique(e.target.value)} placeholder="Critique the Quest — undefended. Don't explain it away." className={fieldCls + ' mt-2'} />
+        </>
+      )}
+      <button onClick={record} disabled={!canRecord} className={primaryBtn + ' mt-2'}>Record the loop</button>
+    </div>
+  )
+}
+
+function TrailView({ data, mut }) {
+  const trough = inTrough(data)
+  return (
+    <section className="max-w-3xl mx-auto space-y-6 px-4 pt-4 pb-24">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">The Weather Trail</h2>
+        <div className="mt-3"><WeatherCheckin data={data} mut={mut} /></div>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">
+          Side Quests {trough && <span className="text-sky-300">· surfaced in the trough</span>}
+        </h3>
+        <p className="text-2xs text-neutral-500">Designed serendipity. +5 XP each.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {SIDE_QUESTS.map((q) => <SideQuestCard key={q.id} q={q} state={data.sideQuests[q.id]} mut={mut} />)}
+        </div>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">Loops</h3>
+        <p className="text-2xs text-neutral-500">Every loop demands one learning line. Returning is not failure — it's the map redrawn.</p>
+        <div className="mt-2 space-y-2">
+          {LOOPS.map((l) => <LoopCard key={l.name} loop={l} mut={mut} />)}
+        </div>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">The Trail</h3>
+        <div className="mt-2 space-y-1.5">
+          {data.trail.length === 0 && <p className="text-sm italic text-neutral-500">No loops or gate crossings yet.</p>}
+          {[...data.trail].reverse().map((t, i) => (
+            <div key={i} className="rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5 text-xs text-neutral-300">
+              <span className="text-neutral-500">{d10(t.date)} · {t.type}</span> — {t.name}
+              {t.learning ? ` — learning: ${t.learning}` : ''}
+              {t.critique ? ` — ${t.critique}` : ''}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function DinnerSession({ s, mut }) {
+  const [remaining, setRemaining] = useState(s.timer || 90 * 60)
+  const [running, setRunning] = useState(false)
+  const [name, setName] = useState('')
+  const [text, setText] = useState('')
+  const [bucket, setBucket] = useState(DINNER_BUCKETS[0])
+  useEffect(() => {
+    if (!running) return
+    const t = setInterval(() => setRemaining((r) => (r > 0 ? r - 1 : 0)), 1000)
+    return () => clearInterval(t)
+  }, [running])
+  const mm = String(Math.floor(remaining / 60)).padStart(2, '0')
+  const ss = String(remaining % 60).padStart(2, '0')
+  const addCard = () => {
+    if (!name.trim()) return
+    mut.addDinnerCard({ name, text, bucket })
+    setName('')
+    setText('')
+    setBucket(DINNER_BUCKETS[0])
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+        <div className="font-mono text-2xl tabular-nums text-neutral-100">{mm}:{ss}</div>
+        <button onClick={() => setRunning((r) => !r)} className="rounded bg-neutral-800 px-2.5 py-1 text-xs text-neutral-100 hover:bg-neutral-700">{running ? 'Pause' : 'Start'} timer</button>
+        <span className="text-2xs text-neutral-500">90 minutes, tops.</span>
+        <button onClick={() => downloadText('family-dinner.md', dinnerToMd(s))} className="rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500">Export this dinner</button>
+        <button onClick={mut.endDinner} className="ml-auto rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500">End dinner</button>
+      </div>
+      <div className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+        <div className="text-2xs uppercase tracking-wider text-neutral-500">Add a card to the table</div>
+        <div className="flex flex-wrap gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={fieldCls + ' flex-1 min-w-[120px]'} />
+          <select value={bucket} onChange={(e) => setBucket(e.target.value)} className={selectCls}>
+            {DINNER_BUCKETS.map((bk) => <option key={bk} value={bk}>{bk}</option>)}
+          </select>
+        </div>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="What's going wrong for them." className={fieldCls} />
+        <button onClick={addCard} disabled={!name.trim()} className={primaryBtn}>Add to the table</button>
+      </div>
+      <div className="space-y-1.5">
+        {s.cards.length === 0 && <p className="text-sm italic text-neutral-500">No cards on the table yet.</p>}
+        {s.cards.map((c) => (
+          <div key={c.id} className="flex items-center gap-2 rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5">
+            <button
+              onClick={() => mut.updateDinnerCard(c.id, { spoke: !c.spoke })}
+              title="mark as spoken"
+              className={'flex h-4 w-4 shrink-0 items-center justify-center rounded border ' + (c.spoke ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-600')}
+            >
+              {c.spoke && <Check size={11} strokeWidth={3} />}
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-neutral-100">{c.name} <span className="text-2xs text-neutral-500">· {c.bucket}</span></div>
+              {c.text && <div className="truncate text-2xs text-neutral-400">{c.text}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-2xs text-neutral-500">{s.cards.filter((c) => c.spoke).length}/{s.cards.length} have spoken.</p>
+    </div>
+  )
+}
+
+function DinnerView({ data, mut }) {
+  const s = data.dinnerSession
+  return (
+    <section className="max-w-3xl mx-auto space-y-4 px-4 pt-4 pb-24">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">Family Dinner</h2>
+        <p className="mt-1 text-sm text-neutral-400">Facilitator mode. What's said at dinner stays at dinner — none of this is ever exported to your Journal, Brief, or the Council. The only way out is the explicit button below.</p>
+      </div>
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+        <h3 className="text-sm font-medium text-neutral-100">Going wrong right now</h3>
+        <p className="text-2xs text-neutral-500">Your own card. This one line leads your Quest Brief.</p>
+        <textarea value={data.dinnerCard?.text || ''} onChange={(e) => mut.setDinnerCard(e.target.value)} placeholder="What's going wrong for you right now." rows={2} className={fieldCls + ' mt-2'} />
+      </div>
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-xs text-neutral-300">
+        <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">Rules of the table</div>
+        No bragging · share what's going wrong · everyone talks · if you can help, help.
+        <div className="mt-1 text-2xs text-neutral-500">Buckets: Been there (pair them) · Now that's interesting (rally) · Do not pass Go (route around it).</div>
+      </div>
+      {!s ? <button onClick={mut.startDinner} className={primaryBtn}>Start a dinner</button> : <DinnerSession s={s} mut={mut} />}
+      {data.dinnerLog.length > 0 && <p className="text-2xs text-neutral-500">{data.dinnerLog.length} past dinner{data.dinnerLog.length > 1 ? 's' : ''} logged (local only, never exported).</p>}
+    </section>
+  )
+}
+
 /* ── app root ─────────────────────────────────────────────────────────── */
 const VIEW_TABS = [
   { id: 'quest', label: 'Quest' },
   { id: 'registry', label: 'Registry' },
   { id: 'ledger', label: 'Ledger' },
   { id: 'vault', label: 'Vault' },
+  { id: 'trail', label: 'Trail' },
+  { id: 'dinner', label: 'Dinner' },
 ]
 
 export default function App() {
@@ -1489,6 +1808,7 @@ export default function App() {
       <div className="min-h-screen bg-neutral-950 text-neutral-100">
         <ProgressHeader data={data} />
         <ViewTabs view={view} setView={setView} tabs={VIEW_TABS} />
+        {inTrough(data) && <TroughBanner />}
         {view === 'quest' && (
           <>
             <StageRail current={current} setCurrent={setCurrent} data={data} />
@@ -1498,6 +1818,8 @@ export default function App() {
         {view === 'registry' && <RegistryView data={data} mut={mut} />}
         {view === 'ledger' && <LedgerView data={data} mut={mut} />}
         {view === 'vault' && <VaultView data={data} mut={mut} />}
+        {view === 'trail' && <TrailView data={data} mut={mut} />}
+        {view === 'dinner' && <DinnerView data={data} mut={mut} />}
       </div>
     </>
   )
