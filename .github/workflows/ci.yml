@@ -34,11 +34,19 @@ jobs:
   # Publishes dist/ + functions/ to Cloudflare Pages on every green push to main.
   # Uses a least-privilege token (Cloudflare Pages: Edit) stored as a repo secret —
   # never in the repo. Skips cleanly until the secret is present, so it never blocks.
+  # Full deploy: publish dist/ + functions/, attach the custom domain, and apply the
+  # rate-limit rule — all idempotent, all from a single least-privilege token
+  # (Cloudflare Pages: Edit + Zone WAF: Edit + DNS: Edit, scoped to one account + zone).
+  # Endpoints/shapes/plan-limits are doc-verified (see the Cloudflare API reference).
   deploy:
     name: deploy to Cloudflare Pages
     needs: [unit, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,15 +55,45 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Publish to Cloudflare Pages
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy to Cloudflare Pages
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::notice::CLOUDFLARE_API_TOKEN not set — skipping deploy. Add the repo secrets (Settings → Secrets and variables → Actions) and re-run this job."
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN not set — skipping deploy. Add the repo secrets (Settings → Secrets and variables → Actions) and re-run."
             exit 0
           fi
           # Create the Pages project on first run (idempotent); ignore "already exists".
           npx wrangler@4 pages project create foundersquest --production-branch=main 2>/dev/null || echo "project exists (ok)"
           npx wrangler@4 pages deploy dist --project-name=foundersquest --branch=main
+      - name: Attach custom domain + apply rate-limit (idempotent)
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then echo "no token — skipped"; exit 0; fi
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4"
+          AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          DOMAIN="foundersquest.ca"
+          # Custom domain — attach only if absent (the POST is NOT idempotent; a blind re-POST 4xxs).
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "$AUTH" \
+            "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/foundersquest/domains/$DOMAIN")
+          if [ "$code" = "200" ]; then
+            echo "custom domain already attached (ok)"
+          else
+            echo "attaching custom domain $DOMAIN"
+            curl -s -X POST -H "$AUTH" -H 'content-type: application/json' \
+              "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/foundersquest/domains" \
+              --data "{\"name\":\"$DOMAIN\"}" | jq -e '.success' >/dev/null \
+              && echo "domain attached" \
+              || echo "::warning::domain attach did not report success (it may already exist — check Pages → Custom domains)"
+          fi
+          # Rate-limit /api/council via the http_ratelimit phase entrypoint (declarative → idempotent).
+          # Free-plan legal: 10 requests / 10s, block 10s, 1 rule. Business+ can widen period and
+          # mitigation_timeout to 600 for 10-minute windows (change the two values below).
+          if [ -n "${CLOUDFLARE_ZONE_ID:-}" ]; then
+            curl -s -X PUT -H "$AUTH" -H 'content-type: application/json' \
+              "$API/zones/$CLOUDFLARE_ZONE_ID/rulesets/phases/http_ratelimit/entrypoint" \
+              --data '{"rules":[{"description":"Rate limit /api/council","expression":"(http.request.uri.path eq \"/api/council\")","action":"block","ratelimit":{"characteristics":["cf.colo.id","ip.src"],"period":10,"requests_per_period":10,"mitigation_timeout":10}}]}' \
+              | jq -e '.success' >/dev/null \
+              && echo "rate-limit rule applied" \
+              || echo "::warning::rate-limit not applied — check the token has Zone WAF: Edit and the plan allows these values"
+          else
+            echo "::warning::CLOUDFLARE_ZONE_ID not set — skipped the rate-limit rule"
+          fi
