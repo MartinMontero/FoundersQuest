@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Lock, Anchor } from 'lucide-react'
 
 /* ═══════════════════════════════════════════════════════════════════════
    Founder's Quest v3 — the static instrument. Single default export.
@@ -554,14 +554,6 @@ const PLACEHOLDER = {
   falsify: 'Be honest about what you actually see.',
 }
 
-// Special types still awaiting their mechanic (arrive in D3). Text is saved now.
-const PENDING_MECHANIC = {
-  seal: "Ariadne's Thread",
-  verdict: 'the verdict seal',
-  vault: 'the Vault picker',
-  spine: 'the evidence-locked Story Forge',
-}
-
 function useInstrument() {
   const q = useQuestData()
   const { setData } = q
@@ -658,6 +650,22 @@ function useInstrument() {
         }
       }),
     }))
+  // ── Vault seal, Ariadne's Thread, verdict, Act Gates (Stage D3) ──
+  const unsealVault = () => setData((d) => (d.vaultUnlocked ? d : { ...d, vaultUnlocked: true }))
+  const sealThread = (stageId, qid) => patchAnswer(stageId, qid, { sealedAt: nowISO() })
+  const setVerdict = (stageId, qid, verdict) => patchAnswer(stageId, qid, { verdict })
+  const passGate = (gateId, name) =>
+    setData((d) => ({
+      ...d,
+      gates: { ...d.gates, [gateId]: { status: 'passed', date: nowISO() } },
+      trail: [...d.trail, { type: 'gate-pass', name, date: nowISO() }],
+    }))
+  const overrideGate = (gateId, name, reason) =>
+    setData((d) => ({
+      ...d,
+      gates: { ...d.gates, [gateId]: { status: 'overridden', reason, date: nowISO() } },
+      trail: [...d.trail, { type: 'gate-override', name, date: nowISO() }],
+    }))
   return {
     ...q,
     patchAnswer,
@@ -671,6 +679,11 @@ function useInstrument() {
     updateEvidence,
     removeEvidence,
     toggleEvidenceLink,
+    unsealVault,
+    sealThread,
+    setVerdict,
+    passGate,
+    overrideGate,
   }
 }
 
@@ -827,15 +840,18 @@ function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault, data, mut })
         </>
       ) : q.type === 'decision' ? (
         <DecisionInput answer={answer} onPatch={onPatch} data={data} />
+      ) : q.type === 'vault' ? (
+        <VaultPicker answer={answer} onPatch={onPatch} data={data} mut={mut} />
+      ) : q.type === 'seal' ? (
+        <ThreadSeal answer={answer} onPatch={onPatch} mut={mut} stageId={q.stageId} qid={q.id} />
+      ) : q.type === 'verdict' ? (
+        <VerdictInput answer={answer} data={data} mut={mut} stageId={q.stageId} qid={q.id} />
+      ) : q.type === 'spine' ? (
+        <SpineInput answer={answer} onPatch={onPatch} data={data} />
       ) : (
         <>
           <ProseInput value={text} onChange={(v) => onPatch({ text: v })} placeholder={PLACEHOLDER[q.type] || 'Write plainly.'} />
           {isActI && <VaultNudge text={text} onCapture={onCaptureVault} />}
-          {PENDING_MECHANIC[q.type] && (
-            <p className="mt-1.5 text-2xs text-neutral-500 italic">
-              Full {PENDING_MECHANIC[q.type]} lands in the next slice — your words are saved.
-            </p>
-          )}
         </>
       )}
 
@@ -917,6 +933,10 @@ function StageView({ stageId, data, mut }) {
           })}
         </div>
       </div>
+
+      {Object.keys(GATES)
+        .filter((gid) => GATES[gid].stageId === stageId)
+        .map((gid) => <GatePanel key={gid} gateId={gid} data={data} mut={mut} />)}
     </section>
   )
 }
@@ -1218,11 +1238,238 @@ function DecisionInput({ answer, onPatch, data }) {
   )
 }
 
+/* ═══ Stage D3: Vault seal · Ariadne's Thread · verdict · spine · Gates ═══ */
+const SPINE_BEATS = [
+  { k: 'once', label: 'Once there was', hint: '[named customer]' },
+  { k: 'everyday', label: 'Every day,', hint: '[struggle]' },
+  { k: 'untilOneDay', label: 'Until one day,', hint: '[your work]' },
+  { k: 'becauseOf', label: 'Because of that,', hint: '[observed outcome]' },
+  { k: 'untilFinally', label: 'Until finally,', hint: '[transformation]' },
+]
+const hasText = (d, s, q) => !!((d.answers?.[s]?.[q]?.text) || '').trim()
+function spineCasts(d) {
+  const beats = d.answers?.s8?.['s8-th']?.beats
+  if (!beats) return false
+  const written = Object.values(beats).filter((b) => (b?.text || '').trim())
+  return written.length > 0 && written.every((b) => (b.cites || []).length > 0)
+}
+
+// Act Gates. Act I / II criteria are canon 03; Act III is derived from the
+// Stage 7–8 milestones (03 defines no Act III gate) — logged as assumption A8.
+const GATES = {
+  act1: {
+    stageId: 's2',
+    title: 'Act I Gate — The First Threshold',
+    criteria: [
+      { label: 'Stage-1 threshold answered', met: (d) => hasText(d, 's1', 's1-th') },
+      { label: '≥ 5 evidence entries at E2+', met: (d) => d.evidence.filter((e) => e.tier >= 2).length >= 5 },
+      { label: '≥ 1 entry at E3/E4', met: (d) => d.evidence.some((e) => e.tier >= 3) },
+      { label: 'a guardian with a written kill criterion', met: (d) => d.assumptions.some((a) => (a.killCriterion || '').trim()) },
+    ],
+  },
+  act2: {
+    stageId: 's5',
+    title: "Act II Gate — The Mirror's Verdict",
+    criteria: [
+      { label: 'verdict recorded', met: (d) => !!d.answers?.s5?.['s5-th']?.verdict },
+      { label: 'pivot/persevere decided, cited to ≥ 1 entry', met: (d) => { const a = d.answers?.s5?.['s5-dec']; return !!(a && a.decision && (a.citedEvidenceIds || []).length >= 1) } },
+    ],
+  },
+  act3: {
+    stageId: 's8',
+    title: 'Act III Gate — The Launch Threshold',
+    criteria: [
+      { label: 'unit walk-through written (Stage 7)', met: (d) => hasText(d, 's7', 's7-th') },
+      { label: 'SPOF + 30-day plan named (Stage 7)', met: (d) => hasText(d, 's7', 's7-l2') },
+      { label: 'launch spine has no uncited beats', met: (d) => spineCasts(d) },
+    ],
+  },
+}
+
+function VaultView({ data }) {
+  return (
+    <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+      <h2 className="text-xl font-semibold tracking-tight">The Vault</h2>
+      <p className="mt-1 text-sm text-neutral-400">Solution ideas you captured in Act I — sealed until Stage 3, so the problem gets its due first.</p>
+      {!data.vaultUnlocked && (
+        <div className="mt-3 flex items-center gap-2 rounded border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
+          <Lock size={14} /> Sealed until Stage 3 — reach The Phoenix to open it.
+        </div>
+      )}
+      <div className={'mt-4 space-y-2 ' + (data.vaultUnlocked ? '' : 'vault-blur')}>
+        {data.vault.length === 0 && <p className="text-sm italic text-neutral-500">Nothing captured yet. When a solution word slips out in Act I, the Vault will offer to hold it.</p>}
+        {data.vault.map((v) => (
+          <div key={v.id} className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-200">{v.text}</div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function VaultPicker({ answer, onPatch, data, mut }) {
+  if (!data.vaultUnlocked) {
+    return (
+      <div className="mt-2">
+        <button onClick={mut.unsealVault} className={primaryBtn}>Unseal the Vault</button>
+        <p className="mt-1 text-2xs text-neutral-500">The Phoenix — Stage 3 opens what Act I sealed.</p>
+      </div>
+    )
+  }
+  if (data.vault.length === 0) return <p className="mt-2 text-2xs italic text-neutral-500">The Vault is empty — no captured ideas to choose from.</p>
+  return (
+    <div className="mt-2 space-y-1.5">
+      {data.vault.map((v) => (
+        <button
+          key={v.id}
+          onClick={() => onPatch({ vaultId: v.id })}
+          className={'block w-full rounded border px-2.5 py-1.5 text-left text-sm ' + (answer.vaultId === v.id ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-200 hover:border-neutral-500')}
+        >
+          {v.text}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ThreadSeal({ answer, onPatch, mut, stageId, qid }) {
+  const [confirming, setConfirming] = useState(false)
+  if (answer.sealedAt) {
+    return (
+      <div className="mt-2 rounded border border-emerald-800 bg-emerald-950/30 p-3">
+        <div className="flex items-center gap-2 text-2xs uppercase tracking-wider text-emerald-300"><Anchor size={12} /> Sealed {d10(answer.sealedAt)}</div>
+        <p className="mt-1.5 whitespace-pre-wrap text-sm text-neutral-100">{answer.text}</p>
+        <p className="mt-1 text-2xs text-neutral-500">Ariadne's Thread is locked. The verdict is recorded in Stage 5, before you interpret anything.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-2">
+      <textarea value={answer.text || ''} onChange={(e) => onPatch({ text: e.target.value })} placeholder="The result that makes you stop or pivot." rows={3} className={fieldCls} />
+      {!confirming ? (
+        <button onClick={() => setConfirming(true)} disabled={!(answer.text || '').trim()} className={primaryBtn + ' mt-2'}>Seal the Thread</button>
+      ) : (
+        <div className="mt-2 rounded border border-amber-800 bg-amber-950/30 p-2.5">
+          <p className="text-xs text-amber-200">Sealing locks this and timestamps it — you can't edit it afterward. That's the point: the kill criterion is fixed before results exist.</p>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => { mut.sealThread(stageId, qid); setConfirming(false) }} className="rounded bg-amber-200 px-3 py-1.5 text-xs font-medium text-amber-950">Seal it</button>
+            <button onClick={() => setConfirming(false)} className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VerdictInput({ answer, data, mut, stageId, qid }) {
+  const thread = data.answers?.s4?.['s4-th']
+  const sealedText = thread && thread.sealedAt ? thread.text : null
+  return (
+    <div className="mt-2 space-y-2">
+      {sealedText ? (
+        <div className="rounded border border-neutral-700 bg-neutral-900 p-2.5">
+          <div className="text-2xs uppercase tracking-wider text-neutral-500">Ariadne's Thread — sealed {d10(thread.sealedAt)}</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-100">{sealedText}</p>
+        </div>
+      ) : (
+        <p className="text-2xs italic text-amber-300">No sealed Thread yet — seal your stop/pivot result in Stage 4 first.</p>
+      )}
+      <div className="flex gap-2">
+        {[['triggered', 'Yes — it triggered'], ['held', 'No — it held']].map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => mut.setVerdict(stageId, qid, v)}
+            disabled={!sealedText}
+            className={'rounded border px-3 py-1.5 text-sm ' + (answer.verdict === v ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300') + (!sealedText ? ' cursor-not-allowed opacity-40' : '')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {answer.verdict && <p className="text-2xs text-neutral-400">Verdict recorded before interpretation. This is the moment to convene the Council.</p>}
+    </div>
+  )
+}
+
+function SpineInput({ answer, onPatch, data }) {
+  const beats = answer.beats || {}
+  const setBeat = (k, patch) => onPatch({ beats: { ...beats, [k]: { ...(beats[k] || {}), ...patch } } })
+  const toggleCite = (k, id) => {
+    const cur = beats[k]?.cites || []
+    setBeat(k, { cites: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] })
+  }
+  const written = SPINE_BEATS.filter((b) => (beats[b.k]?.text || '').trim())
+  const uncited = written.filter((b) => !(beats[b.k]?.cites || []).length)
+  return (
+    <div className="mt-2 space-y-3">
+      {SPINE_BEATS.map((b) => (
+        <div key={b.k}>
+          <div className="text-2xs uppercase tracking-wider text-neutral-500">{b.label} <span className="text-neutral-600">{b.hint}</span></div>
+          <input value={beats[b.k]?.text || ''} onChange={(e) => setBeat(b.k, { text: e.target.value })} placeholder={b.hint} className={fieldCls + ' mt-1'} />
+          {(beats[b.k]?.text || '').trim() && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <span className="text-2xs text-neutral-600">cite:</span>
+              {data.evidence.length === 0 && <span className="text-2xs text-amber-300">no ledger entries yet</span>}
+              {data.evidence.map((e) => (
+                <button key={e.id} onClick={() => toggleCite(b.k, e.id)} title={e.text} className={'rounded border px-1.5 py-0.5 text-2xs ' + ((beats[b.k]?.cites || []).includes(e.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-400 hover:border-neutral-500')}>E{e.tier}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      {written.length > 0 &&
+        (uncited.length ? (
+          <p className="text-2xs text-amber-300">⚠ [unproven] — {uncited.length} beat{uncited.length > 1 ? 's' : ''} without a citation. An uncited spine does not cast.</p>
+        ) : (
+          <p className="text-2xs text-emerald-400">Every written beat cites evidence — the spine casts.</p>
+        ))}
+    </div>
+  )
+}
+
+function GatePanel({ gateId, data, mut }) {
+  const g = GATES[gateId]
+  const [reason, setReason] = useState('')
+  const results = g.criteria.map((c) => ({ label: c.label, met: c.met(data) }))
+  const allMet = results.every((r) => r.met)
+  const state = data.gates[gateId]
+  return (
+    <div className="mt-8 rounded-lg border border-neutral-700 bg-neutral-900/60 p-4">
+      <div className="text-2xs uppercase tracking-[0.2em] text-neutral-500">⛩ Threshold</div>
+      <h3 className="text-base font-semibold text-neutral-100">{g.title}</h3>
+      <ul className="mt-2 space-y-1">
+        {results.map((r, i) => (
+          <li key={i} className="flex items-center gap-2 text-sm">
+            <span className={r.met ? 'text-emerald-400' : 'text-neutral-600'}>{r.met ? '✓' : '○'}</span>
+            <span className={r.met ? 'text-neutral-200' : 'text-neutral-400'}>{r.label}</span>
+          </li>
+        ))}
+      </ul>
+      {state ? (
+        <p className="mt-3 text-xs text-neutral-400">
+          {state.status === 'passed' ? 'Crossed' : 'Overridden'}{state.date ? ` · ${d10(state.date)}` : ''}
+          {state.reason ? ` — "${state.reason}"` : ''}
+        </p>
+      ) : allMet ? (
+        <button onClick={() => mut.passGate(gateId, g.title)} className={primaryBtn + ' mt-3'}>Cross the threshold</button>
+      ) : (
+        <div className="mt-3">
+          <p className="text-xs text-amber-300">The gate warns, it never blocks. To cross with gaps, name the reason — it's logged to your trail and appears in exports.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why cross now, unmet?" className={fieldCls + ' flex-1 min-w-[200px]'} />
+            <button onClick={() => { if (reason.trim()) { mut.overrideGate(gateId, g.title, reason.trim()); setReason('') } }} disabled={!reason.trim()} className="rounded border border-amber-700 bg-amber-900/50 px-3 py-1.5 text-sm text-amber-100 disabled:opacity-40">Override &amp; log</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── app root ─────────────────────────────────────────────────────────── */
 const VIEW_TABS = [
   { id: 'quest', label: 'Quest' },
   { id: 'registry', label: 'Registry' },
   { id: 'ledger', label: 'Ledger' },
+  { id: 'vault', label: 'Vault' },
 ]
 
 export default function App() {
@@ -1230,6 +1477,11 @@ export default function App() {
   const { data, persistent } = mut
   const [view, setView] = useState('quest')
   const [current, setCurrent] = useState('s1')
+  // Reaching Stage 3 (The Phoenix) unseals the Vault — canon 03.
+  useEffect(() => {
+    if (view === 'quest' && current === 's3' && !data.vaultUnlocked) mut.unsealVault()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, current, data.vaultUnlocked])
   return (
     <>
       <QuestStyles />
@@ -1245,6 +1497,7 @@ export default function App() {
         )}
         {view === 'registry' && <RegistryView data={data} mut={mut} />}
         {view === 'ledger' && <LedgerView data={data} mut={mut} />}
+        {view === 'vault' && <VaultView data={data} mut={mut} />}
       </div>
     </>
   )
