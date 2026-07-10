@@ -542,6 +542,7 @@ function StorageBanner() {
    Act-I Vault capture-nudge. Registry/Ledger/Gates/Vault-seal/Thread and
    the Council layer on in D2–D4 / E–F. */
 const uid = (p) => p + Math.random().toString(36).slice(2, 9)
+const nowISO = () => new Date().toISOString()
 
 const PLACEHOLDER = {
   prose: 'Write plainly.',
@@ -585,9 +586,95 @@ function useInstrument() {
   const captureVault = (text) =>
     setData((d) => ({
       ...d,
-      vault: [...d.vault, { id: uid('v'), text, date: new Date().toISOString() }],
+      vault: [...d.vault, { id: uid('v'), text, date: nowISO() }],
     }))
-  return { ...q, patchAnswer, setFieldNote, toggleMilestone, captureVault }
+  // ── Registry (guardians) — tiers are DERIVED, never set here ──
+  const addGuardian = (g) =>
+    setData((d) => ({
+      ...d,
+      assumptions: [
+        ...d.assumptions,
+        {
+          id: uid('a'),
+          statement: (g.statement || '').trim(),
+          originStageId: g.originStageId || null,
+          importance: g.importance || 'wobbles',
+          status: 'untested',
+          killCriterion: g.killCriterion || '',
+          createdAt: nowISO(),
+          resolvedAt: null,
+        },
+      ],
+    }))
+  const updateGuardian = (id, patch) =>
+    setData((d) => ({
+      ...d,
+      assumptions: d.assumptions.map((a) => {
+        if (a.id !== id) return a
+        const next = { ...a, ...patch }
+        const resolved = next.status === 'validated' || next.status === 'invalidated'
+        next.resolvedAt = resolved ? a.resolvedAt || nowISO() : null
+        return next
+      }),
+    }))
+  const removeGuardian = (id) =>
+    setData((d) => ({
+      ...d,
+      assumptions: d.assumptions.filter((a) => a.id !== id),
+      evidence: d.evidence.map((e) => ({
+        ...e,
+        linkedAssumptionIds: (e.linkedAssumptionIds || []).filter((x) => x !== id),
+      })),
+    }))
+  // ── Ledger (evidence) — the tier lives here; guardians inherit the max ──
+  const addEvidence = (ev) =>
+    setData((d) => ({
+      ...d,
+      evidence: [
+        ...d.evidence,
+        {
+          id: uid('e'),
+          tier: Number(ev.tier) || 0,
+          text: (ev.text || '').trim(),
+          source: ev.source || '',
+          linkedAssumptionIds: ev.linkedAssumptionIds || [],
+          stageId: ev.stageId || null,
+          date: nowISO(),
+        },
+      ],
+    }))
+  const updateEvidence = (id, patch) =>
+    setData((d) => ({ ...d, evidence: d.evidence.map((e) => (e.id === id ? { ...e, ...patch } : e)) }))
+  const removeEvidence = (id) =>
+    setData((d) => ({ ...d, evidence: d.evidence.filter((e) => e.id !== id) }))
+  const toggleEvidenceLink = (evId, aId) =>
+    setData((d) => ({
+      ...d,
+      evidence: d.evidence.map((e) => {
+        if (e.id !== evId) return e
+        const has = (e.linkedAssumptionIds || []).includes(aId)
+        return {
+          ...e,
+          linkedAssumptionIds: has
+            ? e.linkedAssumptionIds.filter((x) => x !== aId)
+            : [...(e.linkedAssumptionIds || []), aId],
+        }
+      }),
+    }))
+  return {
+    ...q,
+    patchAnswer,
+    setFieldNote,
+    toggleMilestone,
+    captureVault,
+    addGuardian,
+    updateGuardian,
+    removeGuardian,
+    addEvidence,
+    updateEvidence,
+    removeEvidence,
+    toggleEvidenceLink,
+  }
 }
 
 function Bar({ label, pct, sub }) {
@@ -819,10 +906,220 @@ function StageView({ stageId, data, mut }) {
   )
 }
 
+/* ═══ Stage D2: Assumption Registry + Evidence Ledger ════════════════════ */
+const IMPORTANCE_OPTS = [
+  { v: 'dies', label: 'dies · kills the venture (3)' },
+  { v: 'wobbles', label: 'wobbles · shakes it (2)' },
+  { v: 'shrugs', label: 'shrugs · minor (1)' },
+]
+const STATUS_OPTS = ['untested', 'testing', 'validated', 'invalidated']
+const TIERS = [
+  { v: 0, name: 'Hunch' },
+  { v: 1, name: 'Heard' },
+  { v: 2, name: 'Said' },
+  { v: 3, name: 'Seen' },
+  { v: 4, name: 'Paid' },
+]
+const selectCls = 'rounded bg-neutral-900 border border-neutral-800 text-sm text-neutral-200 px-2 py-1 outline-none focus:border-neutral-600'
+const fieldCls = 'w-full rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm text-neutral-100 placeholder:text-neutral-600'
+const primaryBtn = 'rounded bg-neutral-100 text-neutral-900 text-sm font-medium px-3 py-1.5 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed'
+
+function TierPill({ tier }) {
+  const color =
+    tier >= 4
+      ? 'bg-amber-900/50 text-amber-200 border-amber-700'
+      : tier === 3
+        ? 'bg-emerald-900/50 text-emerald-200 border-emerald-700'
+        : tier === 2
+          ? 'bg-sky-900/50 text-sky-200 border-sky-700'
+          : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+  return (
+    <span className={'inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-2xs font-medium ' + color}>
+      E{tier} · {TIERS[tier].name}
+    </span>
+  )
+}
+
+function AddGuardianForm({ onAdd, originStageId = null }) {
+  const [statement, setStatement] = useState('')
+  const [importance, setImportance] = useState('wobbles')
+  const [kill, setKill] = useState('')
+  const submit = () => {
+    if (!statement.trim()) return
+    onAdd({ statement, importance, killCriterion: kill, originStageId })
+    setStatement('')
+    setKill('')
+    setImportance('wobbles')
+  }
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-2">
+      <textarea value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="The assumption that could kill this — stated plainly." rows={2} className={fieldCls} />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xs uppercase tracking-wider text-neutral-500">Importance</span>
+        <select value={importance} onChange={(e) => setImportance(e.target.value)} className={selectCls}>
+          {IMPORTANCE_OPTS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+        </select>
+      </div>
+      <input value={kill} onChange={(e) => setKill(e.target.value)} placeholder="Kill criterion — the result that would prove it false." className={fieldCls} />
+      <button onClick={submit} disabled={!statement.trim()} className={primaryBtn}>Add guardian</button>
+    </div>
+  )
+}
+
+function GuardianCard({ a, data, mut, riskiest }) {
+  const tier = tierOf(a.id, data.evidence)
+  const linkedCount = data.evidence.filter((e) => (e.linkedAssumptionIds || []).includes(a.id)).length
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-neutral-100">{a.statement}</p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {riskiest && <span className="rounded border border-rose-700 bg-rose-900/50 px-1.5 py-0.5 text-2xs text-rose-200">Riskiest</span>}
+          <TierPill tier={tier} />
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <select value={a.importance} onChange={(e) => mut.updateGuardian(a.id, { importance: e.target.value })} className={selectCls}>
+          {IMPORTANCE_OPTS.map((o) => <option key={o.v} value={o.v}>{o.v}</option>)}
+        </select>
+        <select value={a.status} onChange={(e) => mut.updateGuardian(a.id, { status: e.target.value })} className={selectCls}>
+          {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <span className="text-2xs text-neutral-500">{linkedCount} linked</span>
+        <button onClick={() => mut.removeGuardian(a.id)} className="ml-auto text-2xs text-neutral-500 hover:text-rose-400">remove</button>
+      </div>
+      <input value={a.killCriterion || ''} onChange={(e) => mut.updateGuardian(a.id, { killCriterion: e.target.value })} placeholder="Kill criterion — what would prove it false?" className={fieldCls + ' mt-2 text-xs'} />
+    </div>
+  )
+}
+
+function RegistryView({ data, mut }) {
+  const risk = riskiestGuardian(data)
+  return (
+    <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+      <h2 className="text-xl font-semibold tracking-tight">Assumption Registry</h2>
+      <p className="mt-1 text-sm text-neutral-400">
+        Guardians are the assumptions that could kill the venture. Their evidence tier is <em>derived</em> from the ledger — a founder never grades their own proof.
+      </p>
+      <div className="mt-4"><AddGuardianForm onAdd={mut.addGuardian} /></div>
+      <div className="mt-4 space-y-2">
+        {data.assumptions.length === 0 && (
+          <p className="text-sm italic text-neutral-500">No guardians yet. The first ones usually come from Stage 1 — "this only works if…".</p>
+        )}
+        {data.assumptions.map((a) => (
+          <GuardianCard key={a.id} a={a} data={data} mut={mut} riskiest={risk && risk.id === a.id} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AddEvidenceForm({ data, onAdd }) {
+  const [tier, setTier] = useState(2)
+  const [text, setText] = useState('')
+  const [source, setSource] = useState('')
+  const [links, setLinks] = useState([])
+  const submit = () => {
+    if (!text.trim()) return
+    onAdd({ tier, text, source, linkedAssumptionIds: links })
+    setText('')
+    setSource('')
+    setLinks([])
+    setTier(2)
+  }
+  const toggle = (id) => setLinks((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xs uppercase tracking-wider text-neutral-500">Tier</span>
+        <select value={tier} onChange={(e) => setTier(Number(e.target.value))} className={selectCls}>
+          {TIERS.map((t) => <option key={t.v} value={t.v}>E{t.v} · {t.name}</option>)}
+        </select>
+        {tier < 2 && <span className="text-2xs text-amber-300">E0–E1 won't move Truth — decoration until tested.</span>}
+      </div>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="What happened — a quote, a behavior, a payment." rows={2} className={fieldCls} />
+      <input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Source — who, where." className={fieldCls} />
+      {data.assumptions.length > 0 && (
+        <div>
+          <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">Link to guardians</div>
+          <div className="flex flex-wrap gap-1.5">
+            {data.assumptions.map((a) => (
+              <button key={a.id} onClick={() => toggle(a.id)} className={'rounded border px-2 py-0.5 text-2xs ' + (links.includes(a.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}>
+                {a.statement.slice(0, 32)}{a.statement.length > 32 ? '…' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <button onClick={submit} disabled={!text.trim()} className={primaryBtn}>Log evidence</button>
+    </div>
+  )
+}
+
+function EvidenceCard({ e, data, mut }) {
+  const linked = data.assumptions.filter((a) => (e.linkedAssumptionIds || []).includes(a.id))
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-neutral-100">{e.text}</p>
+        <TierPill tier={e.tier} />
+      </div>
+      {e.source && <p className="mt-1 text-2xs text-neutral-500">— {e.source}</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {linked.map((a) => (
+          <span key={a.id} className="rounded bg-neutral-800 px-1.5 py-0.5 text-2xs text-neutral-300">→ {a.statement.slice(0, 28)}{a.statement.length > 28 ? '…' : ''}</span>
+        ))}
+        <button onClick={() => mut.removeEvidence(e.id)} className="ml-auto text-2xs text-neutral-500 hover:text-rose-400">remove</button>
+      </div>
+    </div>
+  )
+}
+
+function LedgerView({ data, mut }) {
+  return (
+    <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+      <h2 className="text-xl font-semibold tracking-tight">Evidence Ledger</h2>
+      <p className="mt-1 text-sm text-neutral-400">
+        E0 Hunch · E1 Heard · E2 Said · E3 Seen · E4 Paid. Only <strong>E2+</strong> moves Truth; invalidating an assumption pays 1.5× validating one.
+      </p>
+      <div className="mt-4"><AddEvidenceForm data={data} onAdd={mut.addEvidence} /></div>
+      <div className="mt-4 space-y-2">
+        {data.evidence.length === 0 && (
+          <p className="text-sm italic text-neutral-500">No evidence yet. A quote you heard is E2; a behavior you saw is E3; a payment is E4.</p>
+        )}
+        {data.evidence.map((e) => <EvidenceCard key={e.id} e={e} data={data} mut={mut} />)}
+      </div>
+    </section>
+  )
+}
+
+function ViewTabs({ view, setView, tabs }) {
+  return (
+    <nav className="max-w-3xl mx-auto flex gap-1 px-4 pt-3">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setView(t.id)}
+          className={'rounded-t px-3 py-1.5 text-xs font-medium ' + (view === t.id ? 'bg-neutral-900 text-neutral-100 border-b-2 border-neutral-100' : 'text-neutral-400 hover:text-neutral-200')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 /* ── app root ─────────────────────────────────────────────────────────── */
+const VIEW_TABS = [
+  { id: 'quest', label: 'Quest' },
+  { id: 'registry', label: 'Registry' },
+  { id: 'ledger', label: 'Ledger' },
+]
+
 export default function App() {
   const mut = useInstrument()
   const { data, persistent } = mut
+  const [view, setView] = useState('quest')
   const [current, setCurrent] = useState('s1')
   return (
     <>
@@ -830,8 +1127,15 @@ export default function App() {
       {!persistent && <StorageBanner />}
       <div className="min-h-screen bg-neutral-950 text-neutral-100">
         <ProgressHeader data={data} />
-        <StageRail current={current} setCurrent={setCurrent} data={data} />
-        <StageView stageId={current} data={data} mut={mut} />
+        <ViewTabs view={view} setView={setView} tabs={VIEW_TABS} />
+        {view === 'quest' && (
+          <>
+            <StageRail current={current} setCurrent={setCurrent} data={data} />
+            <StageView stageId={current} data={data} mut={mut} />
+          </>
+        )}
+        {view === 'registry' && <RegistryView data={data} mut={mut} />}
+        {view === 'ledger' && <LedgerView data={data} mut={mut} />}
       </div>
     </>
   )

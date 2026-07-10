@@ -4,3 +4,5 @@ dist
 .wrangler
 *.local
 .DS_Store
+LOOP.md
+_smoke.mjs
