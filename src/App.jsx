@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Check, Lock, Anchor } from 'lucide-react'
+import {
+  Check, Lock, Anchor, Compass, Sparkles, Feather, Flame, Map as MapIcon,
+  ScanFace, Hammer, GitMerge, Rocket, CheckCircle2, Circle, Download,
+  Info, X, RotateCcw, Repeat, MapPin, BookOpen,
+} from 'lucide-react'
 
 /* ═══════════════════════════════════════════════════════════════════════
    Founder's Quest v3 — the static instrument. Single default export.
@@ -10,15 +14,17 @@ import { Check, Lock, Anchor } from 'lucide-react'
 /* ═══ content canon (question bank v3, verbatim from canon 03) ════════════
    Format mirrors 03: id · type · verbatim text · hint (written in code per
    law 3; 03 omits hints for budget). Untagged in 03 → type 'prose'. */
+// Mythic chrome per stage — icon, journey-map position, and flavor line come
+// from the original artifact design; the mechanics stay canon 03.
 const STAGES = [
-  { id: 's1', n: 1, name: 'The Problem', myth: 'The Call to Adventure', symbol: 'Swirling Nebula', act: 1 },
-  { id: 's2', n: 2, name: 'Research', myth: 'Meeting the Mentor', symbol: 'The Raven', act: 1 },
-  { id: 's3', n: 3, name: 'Prototyping', myth: 'The Approach', symbol: 'The Phoenix', act: 2 },
-  { id: 's4', n: 4, name: 'Testing', myth: 'Crossing the Threshold', symbol: 'The Labyrinth', act: 2 },
-  { id: 's5', n: 5, name: 'Feedback', myth: 'Tests, Allies & Enemies', symbol: 'The Mirror', act: 2 },
-  { id: 's6', n: 6, name: 'Refinement', myth: 'The Ordeal', symbol: 'The Sculptor', act: 3 },
-  { id: 's7', n: 7, name: 'Implementation', myth: 'The Road Back', symbol: 'The Bridge', act: 3 },
-  { id: 's8', n: 8, name: 'Launch', myth: 'Return with the Elixir', symbol: 'The Rocket', act: 3 },
+  { id: 's1', n: 1, name: 'The Problem', myth: 'The Call to Adventure', symbol: 'Swirling Nebula', act: 1, icon: Sparkles, gridOrder: 0, description: 'The birth of ideas. Formless potential waiting to be shaped.' },
+  { id: 's2', n: 2, name: 'Research', myth: 'Meeting the Mentor', symbol: 'The Raven', act: 1, icon: Feather, gridOrder: 1, description: 'Deep dives and uncovering hidden truths in the market.' },
+  { id: 's3', n: 3, name: 'Prototyping', myth: 'The Approach', symbol: 'The Phoenix', act: 2, icon: Flame, gridOrder: 2, description: 'Rising from ashes, representing rapid iteration and improvement.' },
+  { id: 's4', n: 4, name: 'Testing', myth: 'Crossing the Threshold', symbol: 'The Labyrinth', act: 2, icon: MapIcon, gridOrder: 5, description: 'The exploration of different paths and outcomes. Finding the way through.' },
+  { id: 's5', n: 5, name: 'Feedback', myth: 'Tests, Allies & Enemies', symbol: 'The Mirror', act: 2, icon: ScanFace, gridOrder: 8, description: 'Reflection, self-assessment, and confronting the truth of the market.' },
+  { id: 's6', n: 6, name: 'Refinement', myth: 'The Ordeal', symbol: 'The Sculptor', act: 3, icon: Hammer, gridOrder: 7, description: 'Chiseling a masterpiece, shaping and polishing the work.' },
+  { id: 's7', n: 7, name: 'Implementation', myth: 'The Road Back', symbol: 'The Bridge', act: 3, icon: GitMerge, gridOrder: 6, description: 'The connection between the realm of ideas and the real world.' },
+  { id: 's8', n: 8, name: 'Launch', myth: 'Return with the Elixir', symbol: 'The Rocket', act: 3, icon: Rocket, gridOrder: 3, description: 'Taking off. The release and growth of the project into the unknown.' },
 ]
 
 // Field-rules banners shown atop a stage (canon 03).
@@ -502,15 +508,40 @@ function useQuestData() {
   return { data, setData, store, persistent: store.persistent }
 }
 
-/* ── injected styles Tailwind core doesn't cover (canon 02) ──────────── */
+/* ── injected styles Tailwind core doesn't cover (canon 02) ──────────────
+   The design system's effects — glows, radial gradients, custom spins,
+   animations, scrollbar — from the original artifact, plus the v3 vault
+   blur and z-layers. */
 function QuestStyles() {
   return (
     <style>{`
-      .text-2xs { font-size: 11px; line-height: 1.35; }
+      .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 1); }
+
+      .glow-sm-indigo { box-shadow: 0 0 15px rgba(99, 102, 241, 0.2); }
+      .glow-lg-indigo { box-shadow: 0 0 40px rgba(99, 102, 241, 0.2); }
+      .glow-emerald-drop { filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.5)); }
+      .radial-indigo { background: radial-gradient(circle at center, rgba(99, 102, 241, 0.25) 0%, transparent 70%); }
+
+      @keyframes fq-spin { to { transform: rotate(360deg); } }
+      .spin-slow { animation: fq-spin 12s linear infinite; }
+
+      @keyframes fq-enter { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+      .enter-anim { animation: fq-enter 0.5s ease-out both; }
+
+      @keyframes fq-fade { from { opacity: 0; } to { opacity: 1; } }
+      .fade-in { animation: fq-fade 0.2s ease-out; }
+
+      .text-2xs { font-size: 10px; line-height: 1.25; }
+      .text-3xs { font-size: 9px; line-height: 1.15; }
+      .max-h-85 { max-height: 85vh; }
       .z-vault { z-index: 40; }
-      .z-modal { z-index: 50; }
-      .z-toast { z-index: 60; }
+      .z-modal { z-index: 100; }
+      .z-toast { z-index: 110; }
       .vault-blur { filter: blur(6px); user-select: none; pointer-events: none; }
+
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
           animation-duration: 0.001ms !important;
@@ -678,6 +709,7 @@ function useInstrument() {
       gates: { ...d.gates, [gateId]: { status: 'overridden', reason, date: nowISO() } },
       trail: [...d.trail, { type: 'gate-override', name, date: nowISO() }],
     }))
+  const resetQuest = () => setData({ ...EMPTY_DATA })
   // ── Weather · Side Quests · Loops · Family Dinner (Stage D4) ──
   const setWeather = (value) =>
     setData((d) => {
@@ -696,7 +728,7 @@ function useInstrument() {
   const recordLoop = (loop) =>
     setData((d) => ({
       ...d,
-      lastLoop: loop.name,
+      lastLoop: { name: loop.name, fromId: loop.fromId, toId: loop.toId },
       trail: [...d.trail, { type: 'loop', name: loop.name, fromId: loop.fromId, toId: loop.toId, learning: loop.learning, critique: loop.critique || null, date: nowISO() }],
     }))
   const setDinnerCard = (text) => setData((d) => ({ ...d, dinnerCard: { text, updatedAt: nowISO() } }))
@@ -745,6 +777,7 @@ function useInstrument() {
     setVerdict,
     passGate,
     overrideGate,
+    resetQuest,
     setWeather,
     startSideQuest,
     setSideQuestText,
@@ -764,58 +797,135 @@ function useInstrument() {
 
 function Bar({ label, pct, sub }) {
   return (
-    <div className="flex-1 min-w-[110px]">
-      <div className="flex justify-between text-2xs uppercase tracking-wider text-neutral-400">
+    <div className="min-w-[110px] flex-1">
+      <div className="flex justify-between text-2xs font-bold uppercase tracking-wider text-slate-400">
         <span>{label}</span>
         <span>{sub}</span>
       </div>
-      <div className="mt-1 h-1.5 rounded bg-neutral-800 overflow-hidden">
-        <div className="h-full bg-neutral-300 transition-all" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      <div className="mt-1 h-2 overflow-hidden rounded-full border border-slate-700 bg-slate-800 shadow-inner">
+        <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
       </div>
     </div>
   )
 }
 
-function ProgressHeader({ data }) {
+function Header({ data, onOpenGuide, onReset }) {
   const truth = computeTruth(data)
   const done = Object.values(data.milestones).filter(Boolean).length
+  const [confirmReset, setConfirmReset] = useState(false)
+  useEffect(() => {
+    if (!confirmReset) return
+    const t = setTimeout(() => setConfirmReset(false), 4000)
+    return () => clearTimeout(t)
+  }, [confirmReset])
+  const btn = 'inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1.5 text-xs font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900'
+  const btnMuted = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900'
   return (
-    <header className="sticky top-0 z-modal bg-neutral-950/90 backdrop-blur border-b border-neutral-800 px-4 py-3">
-      <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="text-sm font-semibold tracking-tight whitespace-nowrap">Founder's Quest</div>
+    <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Compass className="h-7 w-7 text-indigo-500" />
+          <div>
+            <h1 className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-lg font-bold leading-tight text-transparent">Founder's Quest</h1>
+            <p className="text-2xs font-medium uppercase tracking-widest text-slate-500">Genesis Framework · v3</p>
+          </div>
+        </div>
         <Bar label="Truth" pct={truth == null ? 0 : truth * 100} sub={fmtPct(truth)} />
         <Bar label="Action" pct={MILESTONE_TOTAL ? (done / MILESTONE_TOTAL) * 100 : 0} sub={`${done}/${MILESTONE_TOTAL}`} />
-        <div className="text-2xs uppercase tracking-wider text-neutral-400 whitespace-nowrap">XP {computeXP(data)}</div>
-        <div className="flex gap-1">
-          <button onClick={() => downloadText('founders-quest-journal.md', buildJournalMd(data, 'full'))} className="rounded border border-neutral-700 px-2 py-1 text-2xs text-neutral-300 hover:border-neutral-500">↓ Journal</button>
-          <button onClick={() => downloadText('founders-quest-brief.md', buildBriefMd(data))} className="rounded border border-neutral-700 px-2 py-1 text-2xs text-neutral-300 hover:border-neutral-500">↓ Brief</button>
+        <span className="whitespace-nowrap text-xs font-bold text-amber-300">{computeXP(data)} XP</span>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <button onClick={onOpenGuide} className={btn}><Info size={13} /> Guide</button>
+          <button onClick={() => downloadText('founders-quest-journal.md', buildJournalMd(data, 'full'))} className={btn}><Download size={13} /> Journal</button>
+          <button onClick={() => downloadText('founders-quest-brief.md', buildBriefMd(data))} className={btn}><BookOpen size={13} /> Brief</button>
+          {!confirmReset ? (
+            <button onClick={() => setConfirmReset(true)} className={btnMuted}><RotateCcw size={13} /> Reset</button>
+          ) : (
+            <>
+              <button onClick={() => { onReset(); setConfirmReset(false) }} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-2.5 py-1.5 text-xs font-semibold text-rose-300 transition-colors hover:bg-rose-500/25 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-slate-900"><RotateCcw size={13} /> Yes, reset</button>
+              <button onClick={() => setConfirmReset(false)} className={btnMuted}>Cancel</button>
+            </>
+          )}
         </div>
       </div>
     </header>
   )
 }
 
-function StageRail({ current, setCurrent, data }) {
+// The 3×3 mythic journey map — stages orbit the Core Quest hub (artifact design).
+function MythicGrid({ current, setCurrent, data }) {
+  const grid = new Array(9).fill(null)
+  STAGES.forEach((s) => { grid[s.gridOrder] = s })
   return (
-    <nav className="max-w-3xl mx-auto px-4 py-3 flex gap-1 overflow-x-auto">
-      {STAGES.map((s) => {
-        const answered = data.answers[s.id] && Object.keys(data.answers[s.id]).length
-        const active = s.id === current
+    <nav className="grid w-full max-w-md grid-cols-3 gap-3 sm:gap-4" aria-label="The mythic journey">
+      {grid.map((stage, index) => {
+        if (index === 4) {
+          return (
+            <div key="hub" className="glow-lg-indigo relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-full border-4 border-indigo-500/30 bg-indigo-900/40 p-4">
+              <div className="radial-indigo absolute inset-0 animate-pulse" />
+              <Compass className="spin-slow relative z-10 h-12 w-12 text-indigo-300" />
+              <span className="relative z-10 mt-2 text-center text-2xs font-bold uppercase tracking-widest text-indigo-200">Core<br />Quest</span>
+            </div>
+          )
+        }
+        if (!stage) return <div key={`empty-${index}`} />
+        const isActive = current === stage.id
+        const labels = MILESTONES[stage.id] || []
+        const total = labels.length
+        const doneCount = labels.filter((_, i) => data.milestones[`${stage.id}-m${i}`]).length
+        const isCompleted = total > 0 && doneCount === total
+        const Icon = stage.icon
         return (
           <button
-            key={s.id}
-            onClick={() => setCurrent(s.id)}
-            className={
-              'shrink-0 rounded px-2.5 py-1.5 text-left transition ' +
-              (active ? 'bg-neutral-100 text-neutral-900' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800')
-            }
+            key={stage.id}
+            onClick={() => setCurrent(stage.id)}
+            className={`group relative flex aspect-square flex-col items-center justify-center rounded-2xl p-4 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+              isActive
+                ? 'z-10 scale-105 border-2 border-indigo-300 bg-gradient-to-br from-indigo-600 to-purple-700 shadow-lg shadow-indigo-500/40'
+                : 'border-2 border-slate-700/50 bg-slate-800 hover:border-indigo-400/50 hover:bg-slate-700'
+            }`}
           >
-            <div className="text-2xs uppercase tracking-wider opacity-70">Stage {s.n}{answered ? ' ·' : ''}</div>
-            <div className="text-xs font-medium whitespace-nowrap">{s.name}</div>
+            {isCompleted ? (
+              <div className="glow-emerald-drop absolute right-2 top-2 text-emerald-400" title="Stage complete"><CheckCircle2 size={16} /></div>
+            ) : (
+              <div className={`absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-3xs font-bold leading-none ${doneCount > 0 ? (isActive ? 'bg-white/15 text-white' : 'bg-indigo-500/15 text-indigo-300') : (isActive ? 'bg-white/10 text-indigo-100/70' : 'bg-slate-700/60 text-slate-500')}`} title={`${doneCount} of ${total} milestones complete`}>
+                {doneCount}/{total}
+              </div>
+            )}
+            <div className={`absolute left-2 top-2 text-xs font-bold ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>{stage.n}</div>
+            <Icon className={`mb-2 h-8 w-8 transition-transform duration-300 ${isActive ? 'scale-110 text-white' : 'text-indigo-400 group-hover:scale-110 group-hover:text-indigo-300'}`} />
+            <span className={`text-center text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>{stage.name}</span>
+            <span className={`mt-1 text-center text-3xs uppercase leading-tight tracking-wider ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>{stage.symbol}</span>
           </button>
         )
       })}
     </nav>
+  )
+}
+
+// "You are here" — current position plus the last named loop taken (artifact design).
+function TrailBar({ current, lastLoop, onGo }) {
+  const loop = lastLoop && typeof lastLoop === 'object' ? lastLoop : null
+  const from = loop ? STAGES.find((s) => s.id === loop.fromId) : null
+  const to = loop ? STAGES.find((s) => s.id === loop.toId) : null
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+      <span className="inline-flex items-center gap-1.5 text-2xs font-bold uppercase tracking-widest text-slate-500"><MapPin size={12} /> You are here</span>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/15 px-2.5 py-1 font-semibold text-indigo-200">
+        <span className="text-2xs opacity-70">{current.n}</span>
+        {current.name}
+        <span className="font-normal text-indigo-300/60">· {current.myth}</span>
+      </span>
+      {loop && from && to && (
+        <>
+          <span className="text-slate-700">•</span>
+          <span className="whitespace-nowrap text-2xs font-bold uppercase tracking-wider text-slate-500">Last loop</span>
+          <button onClick={() => onGo(to.id)} title={`${loop.name} — return to ${to.name}`} className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 font-semibold text-pink-200 transition-colors hover:bg-pink-500/20 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:ring-offset-slate-950">
+            <Repeat size={11} /> {loop.name}
+            <span className="whitespace-nowrap font-normal text-pink-300/70">{from.name} → {to.name}</span>
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -826,7 +936,7 @@ function ProseInput({ value, onChange, placeholder, rows = 3 }) {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full mt-2 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2.5 text-sm text-neutral-100 placeholder:text-neutral-600 resize-y"
+      className={fieldCls + ' mt-2 resize-y'}
     />
   )
 }
@@ -842,17 +952,17 @@ function FiveWhysInput({ whys, onChange }) {
     <div className="mt-2 space-y-2">
       {arr.map((w, i) => (
         <div key={i} className="flex items-start gap-2">
-          <span className="text-2xs text-neutral-500 mt-2 w-12 shrink-0">why {i + 1}</span>
+          <span className="text-2xs text-slate-500 mt-2 w-12 shrink-0">why {i + 1}</span>
           <input
             value={w}
             onChange={(e) => set(i, e.target.value)}
             placeholder={i === 0 ? 'Because…' : 'And why is that?'}
-            className="flex-1 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm"
+            className={fieldCls + ' flex-1'}
           />
         </div>
       ))}
       {arr.length < 5 && (
-        <button onClick={() => onChange([...arr, ''])} className="text-xs text-neutral-400 hover:text-neutral-200">
+        <button onClick={() => onChange([...arr, ''])} className="text-xs text-slate-400 hover:text-slate-200">
           + dig one why deeper
         </button>
       )}
@@ -861,19 +971,19 @@ function FiveWhysInput({ whys, onChange }) {
 }
 
 function IfThenInput({ answer, onPatch }) {
-  const field = 'w-full mt-1 rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm'
+  const field = fieldCls + ' mt-1'
   return (
     <div className="mt-2 space-y-2">
       <label className="block">
-        <span className="text-2xs uppercase tracking-wider text-neutral-500">IF</span>
+        <span className="text-2xs uppercase tracking-wider text-slate-500">IF</span>
         <input value={answer.ifPart || ''} onChange={(e) => onPatch({ ifPart: e.target.value })} placeholder="the condition you're betting on" className={field} />
       </label>
       <label className="block">
-        <span className="text-2xs uppercase tracking-wider text-neutral-500">THEN when [segment] meets [prototype], we will observe</span>
+        <span className="text-2xs uppercase tracking-wider text-slate-500">THEN when [segment] meets [prototype], we will observe</span>
         <input value={answer.thenPart || ''} onChange={(e) => onPatch({ thenPart: e.target.value })} placeholder="the behavior you'll see" className={field} />
       </label>
       <label className="block w-40">
-        <span className="text-2xs uppercase tracking-wider text-neutral-500">WITHIN (days)</span>
+        <span className="text-2xs uppercase tracking-wider text-slate-500">WITHIN (days)</span>
         <input type="number" min="1" value={answer.withinDays || ''} onChange={(e) => onPatch({ withinDays: e.target.value })} className={field} />
       </label>
     </div>
@@ -903,10 +1013,10 @@ function QuestionCard({ q, answer, onPatch, isActI, onCaptureVault, data, mut })
   const text = answer.text || ''
   const registersGuardian = q.type === 'quickadd' || q.id === 's3-l2' || q.id === 's7-th'
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+    <div className="rounded-xl border border-slate-700/50 border-l-4 border-l-purple-500/60 bg-slate-800/40 p-4 shadow-sm transition-colors hover:bg-slate-800/60">
       {q.badge && <div className="text-2xs uppercase tracking-widest text-amber-300 mb-1">✦ {q.badge}</div>}
-      <p className="text-sm text-neutral-100">{q.text}</p>
-      <p className="text-2xs text-neutral-500 mt-1">{q.hint}</p>
+      <p className="text-sm leading-relaxed text-slate-200">{q.text}</p>
+      <p className="text-2xs text-slate-500 mt-1">{q.hint}</p>
 
       {q.type === 'fivewhys' ? (
         <FiveWhysInput whys={answer.whys} onChange={(whys) => onPatch({ whys })} />
@@ -950,72 +1060,86 @@ function StageView({ stageId, data, mut }) {
   const qs = QUESTIONS.filter((q) => q.stageId === stageId)
   const answers = data.answers[stageId] || {}
   const isActI = stage.act === 1
+  const Icon = stage.icon
   return (
-    <section className="max-w-3xl mx-auto px-4 pb-24">
-      <div className="pt-4 pb-3">
-        <div className="text-2xs uppercase tracking-[0.2em] text-neutral-500">
-          Stage {stage.n} · {stage.myth} · {stage.symbol}
+    <section className="enter-anim relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
+      <div className="absolute left-0 right-0 top-0 z-10 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
+      <header className="relative overflow-hidden border-b border-slate-700/50 bg-gradient-to-br from-slate-800 to-slate-900 p-6 sm:p-8">
+        <div className="pointer-events-none absolute -right-10 -top-10 rotate-12 p-8 opacity-5"><Icon size={200} /></div>
+        <div className="relative z-10">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <span className="glow-sm-indigo flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-indigo-500/30 bg-indigo-500/20 text-sm font-bold text-indigo-400">{stage.n}</span>
+            <h2 className="text-3xl font-bold tracking-tight text-white">{stage.name}</h2>
+          </div>
+          <h3 className="text-lg font-medium text-indigo-300">{stage.symbol}</h3>
+          <p className="mb-2 text-xs italic text-slate-500">Monomyth beat · {stage.myth}</p>
+          <p className="max-w-xl text-sm leading-relaxed text-slate-400">{stage.description}</p>
         </div>
-        <h2 className="text-xl font-semibold tracking-tight text-neutral-100">{stage.name}</h2>
-      </div>
+      </header>
 
-      {STAGE_BANNERS[stageId] && (
-        <div className="mb-4 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
-          {STAGE_BANNERS[stageId]}
+      <div className="p-5 sm:p-7">
+        {STAGE_BANNERS[stageId] && (
+          <div className="mb-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2.5 text-xs leading-relaxed text-indigo-200">
+            {STAGE_BANNERS[stageId]}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {qs.map((q) => (
+            <React.Fragment key={q.id}>
+              {SECTIONS[q.id] && (
+                <h3 className="pt-3 text-xs font-bold uppercase tracking-widest text-indigo-300">{SECTIONS[q.id]}</h3>
+              )}
+              <QuestionCard
+                q={q}
+                answer={answers[q.id] || {}}
+                onPatch={(patch) => mut.patchAnswer(stageId, q.id, patch)}
+                isActI={isActI}
+                onCaptureVault={mut.captureVault}
+                data={data}
+                mut={mut}
+              />
+            </React.Fragment>
+          ))}
         </div>
-      )}
 
-      <div className="space-y-3">
-        {qs.map((q) => (
-          <React.Fragment key={q.id}>
-            {SECTIONS[q.id] && (
-              <h3 className="pt-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">{SECTIONS[q.id]}</h3>
-            )}
-            <QuestionCard
-              q={q}
-              answer={answers[q.id] || {}}
-              onPatch={(patch) => mut.patchAnswer(stageId, q.id, patch)}
-              isActI={isActI}
-              onCaptureVault={mut.captureVault}
-              data={data}
-              mut={mut}
-            />
-          </React.Fragment>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Field notes</h3>
-        <ProseInput
-          value={data.fieldNotes[stageId] || ''}
-          onChange={(v) => mut.setFieldNote(stageId, v)}
-          placeholder="Anything else worth recording for this stage."
-        />
-      </div>
-
-      <div className="mt-6">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-          Milestones <span className="text-neutral-600">· self-reported</span>
-        </h3>
-        <div className="mt-2 space-y-1.5">
-          {(MILESTONES[stageId] || []).map((label, i) => {
-            const id = `${stageId}-m${i}`
-            const on = !!data.milestones[id]
-            return (
-              <button key={id} onClick={() => mut.toggleMilestone(id)} className="flex items-center gap-2 text-sm text-left">
-                <span className={'flex h-4 w-4 items-center justify-center rounded border ' + (on ? 'bg-neutral-100 border-neutral-100 text-neutral-900' : 'border-neutral-600')}>
-                  {on && <Check size={12} strokeWidth={3} />}
-                </span>
-                <span className={on ? 'text-neutral-200' : 'text-neutral-400'}>{label}</span>
-              </button>
-            )
-          })}
+        <div className="mt-7">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><BookOpen size={14} className="text-purple-400" /> Field notes</h3>
+          <ProseInput
+            value={data.fieldNotes[stageId] || ''}
+            onChange={(v) => mut.setFieldNote(stageId, v)}
+            placeholder="Anything else worth recording for this stage."
+          />
         </div>
-      </div>
 
-      {Object.keys(GATES)
-        .filter((gid) => GATES[gid].stageId === stageId)
-        .map((gid) => <GatePanel key={gid} gateId={gid} data={data} mut={mut} />)}
+        <div className="mt-7">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+            <CheckCircle2 size={14} className="text-emerald-400" /> Milestones <span className="font-medium normal-case tracking-normal text-slate-600">· self-reported</span>
+          </h3>
+          <div className="mt-2.5 space-y-2">
+            {(MILESTONES[stageId] || []).map((label, i) => {
+              const id = `${stageId}-m${i}`
+              const on = !!data.milestones[id]
+              return (
+                <button
+                  key={id}
+                  onClick={() => mut.toggleMilestone(id)}
+                  aria-pressed={on}
+                  className={'flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 ' + (on ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700/50 bg-slate-800/50 text-slate-300 hover:bg-slate-800')}
+                >
+                  {on ? <CheckCircle2 size={18} className="shrink-0 text-emerald-400" /> : <Circle size={18} className="shrink-0 text-slate-500" />}
+                  <span className={'text-sm leading-tight ' + (on ? 'line-through opacity-60' : '')}>{label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {Object.keys(GATES)
+          .filter((gid) => GATES[gid].stageId === stageId)
+          .map((gid) => <GatePanel key={gid} gateId={gid} data={data} mut={mut} />)}
+      </div>
     </section>
   )
 }
@@ -1034,9 +1158,9 @@ const TIERS = [
   { v: 3, name: 'Seen' },
   { v: 4, name: 'Paid' },
 ]
-const selectCls = 'rounded bg-neutral-900 border border-neutral-800 text-sm text-neutral-200 px-2 py-1 outline-none focus:border-neutral-600'
-const fieldCls = 'w-full rounded bg-neutral-900 border border-neutral-800 focus:border-neutral-600 outline-none p-2 text-sm text-neutral-100 placeholder:text-neutral-600'
-const primaryBtn = 'rounded bg-neutral-100 text-neutral-900 text-sm font-medium px-3 py-1.5 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed'
+const selectCls = 'rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 px-2 py-1 outline-none focus:border-indigo-500'
+const fieldCls = 'w-full rounded-xl bg-slate-950/50 border border-slate-700/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none p-2.5 text-sm text-slate-200 placeholder:text-slate-600 shadow-inner'
+const primaryBtn = 'rounded-lg bg-indigo-600 text-white text-sm font-semibold px-3.5 py-1.5 hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900'
 
 function TierPill({ tier }) {
   const color =
@@ -1046,7 +1170,7 @@ function TierPill({ tier }) {
         ? 'bg-emerald-900/50 text-emerald-200 border-emerald-700'
         : tier === 2
           ? 'bg-sky-900/50 text-sky-200 border-sky-700'
-          : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+          : 'bg-slate-800 text-slate-400 border-slate-700'
   return (
     <span className={'inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-2xs font-medium ' + color}>
       E{tier} · {TIERS[tier].name}
@@ -1066,10 +1190,10 @@ function AddGuardianForm({ onAdd, originStageId = null }) {
     setImportance('wobbles')
   }
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-2">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4 space-y-2">
       <textarea value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="The assumption that could kill this — stated plainly." rows={2} className={fieldCls} />
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xs uppercase tracking-wider text-neutral-500">Importance</span>
+        <span className="text-2xs uppercase tracking-wider text-slate-500">Importance</span>
         <select value={importance} onChange={(e) => setImportance(e.target.value)} className={selectCls}>
           {IMPORTANCE_OPTS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
         </select>
@@ -1084,9 +1208,9 @@ function GuardianCard({ a, data, mut, riskiest }) {
   const tier = tierOf(a.id, data.evidence)
   const linkedCount = data.evidence.filter((e) => (e.linkedAssumptionIds || []).includes(a.id)).length
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-neutral-100">{a.statement}</p>
+        <p className="text-sm text-slate-100">{a.statement}</p>
         <div className="flex shrink-0 items-center gap-1.5">
           {riskiest && <span className="rounded border border-rose-700 bg-rose-900/50 px-1.5 py-0.5 text-2xs text-rose-200">Riskiest</span>}
           <TierPill tier={tier} />
@@ -1099,8 +1223,8 @@ function GuardianCard({ a, data, mut, riskiest }) {
         <select value={a.status} onChange={(e) => mut.updateGuardian(a.id, { status: e.target.value })} className={selectCls}>
           {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <span className="text-2xs text-neutral-500">{linkedCount} linked</span>
-        <button onClick={() => mut.removeGuardian(a.id)} className="ml-auto text-2xs text-neutral-500 hover:text-rose-400">remove</button>
+        <span className="text-2xs text-slate-500">{linkedCount} linked</span>
+        <button onClick={() => mut.removeGuardian(a.id)} className="ml-auto text-2xs text-slate-500 hover:text-rose-400">remove</button>
       </div>
       <input value={a.killCriterion || ''} onChange={(e) => mut.updateGuardian(a.id, { killCriterion: e.target.value })} placeholder="Kill criterion — what would prove it false?" className={fieldCls + ' mt-2 text-xs'} />
     </div>
@@ -1112,13 +1236,13 @@ function RegistryView({ data, mut }) {
   return (
     <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <h2 className="text-xl font-semibold tracking-tight">Assumption Registry</h2>
-      <p className="mt-1 text-sm text-neutral-400">
+      <p className="mt-1 text-sm text-slate-400">
         Guardians are the assumptions that could kill the venture. Their evidence tier is <em>derived</em> from the ledger — a founder never grades their own proof.
       </p>
       <div className="mt-4"><AddGuardianForm onAdd={mut.addGuardian} /></div>
       <div className="mt-4 space-y-2">
         {data.assumptions.length === 0 && (
-          <p className="text-sm italic text-neutral-500">No guardians yet. The first ones usually come from Stage 1 — "this only works if…".</p>
+          <p className="text-sm italic text-slate-500">No guardians yet. The first ones usually come from Stage 1 — "this only works if…".</p>
         )}
         {data.assumptions.map((a) => (
           <GuardianCard key={a.id} a={a} data={data} mut={mut} riskiest={risk && risk.id === a.id} />
@@ -1143,9 +1267,9 @@ function AddEvidenceForm({ data, onAdd }) {
   }
   const toggle = (id) => setLinks((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-2">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xs uppercase tracking-wider text-neutral-500">Tier</span>
+        <span className="text-2xs uppercase tracking-wider text-slate-500">Tier</span>
         <select value={tier} onChange={(e) => setTier(Number(e.target.value))} className={selectCls}>
           {TIERS.map((t) => <option key={t.v} value={t.v}>E{t.v} · {t.name}</option>)}
         </select>
@@ -1155,10 +1279,10 @@ function AddEvidenceForm({ data, onAdd }) {
       <input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Source — who, where." className={fieldCls} />
       {data.assumptions.length > 0 && (
         <div>
-          <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">Link to guardians</div>
+          <div className="mb-1 text-2xs uppercase tracking-wider text-slate-500">Link to guardians</div>
           <div className="flex flex-wrap gap-1.5">
             {data.assumptions.map((a) => (
-              <button key={a.id} onClick={() => toggle(a.id)} className={'rounded border px-2 py-0.5 text-2xs ' + (links.includes(a.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}>
+              <button key={a.id} onClick={() => toggle(a.id)} className={'rounded border px-2 py-0.5 text-2xs ' + (links.includes(a.id) ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:border-slate-500')}>
                 {a.statement.slice(0, 32)}{a.statement.length > 32 ? '…' : ''}
               </button>
             ))}
@@ -1173,17 +1297,17 @@ function AddEvidenceForm({ data, onAdd }) {
 function EvidenceCard({ e, data, mut }) {
   const linked = data.assumptions.filter((a) => (e.linkedAssumptionIds || []).includes(a.id))
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-neutral-100">{e.text}</p>
+        <p className="text-sm text-slate-100">{e.text}</p>
         <TierPill tier={e.tier} />
       </div>
-      {e.source && <p className="mt-1 text-2xs text-neutral-500">— {e.source}</p>}
+      {e.source && <p className="mt-1 text-2xs text-slate-500">— {e.source}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {linked.map((a) => (
-          <span key={a.id} className="rounded bg-neutral-800 px-1.5 py-0.5 text-2xs text-neutral-300">→ {a.statement.slice(0, 28)}{a.statement.length > 28 ? '…' : ''}</span>
+          <span key={a.id} className="rounded bg-slate-800 px-1.5 py-0.5 text-2xs text-slate-300">→ {a.statement.slice(0, 28)}{a.statement.length > 28 ? '…' : ''}</span>
         ))}
-        <button onClick={() => mut.removeEvidence(e.id)} className="ml-auto text-2xs text-neutral-500 hover:text-rose-400">remove</button>
+        <button onClick={() => mut.removeEvidence(e.id)} className="ml-auto text-2xs text-slate-500 hover:text-rose-400">remove</button>
       </div>
     </div>
   )
@@ -1193,13 +1317,13 @@ function LedgerView({ data, mut }) {
   return (
     <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <h2 className="text-xl font-semibold tracking-tight">Evidence Ledger</h2>
-      <p className="mt-1 text-sm text-neutral-400">
+      <p className="mt-1 text-sm text-slate-400">
         E0 Hunch · E1 Heard · E2 Said · E3 Seen · E4 Paid. Only <strong>E2+</strong> moves Truth; invalidating an assumption pays 1.5× validating one.
       </p>
       <div className="mt-4"><AddEvidenceForm data={data} onAdd={mut.addEvidence} /></div>
       <div className="mt-4 space-y-2">
         {data.evidence.length === 0 && (
-          <p className="text-sm italic text-neutral-500">No evidence yet. A quote you heard is E2; a behavior you saw is E3; a payment is E4.</p>
+          <p className="text-sm italic text-slate-500">No evidence yet. A quote you heard is E2; a behavior you saw is E3; a payment is E4.</p>
         )}
         {data.evidence.map((e) => <EvidenceCard key={e.id} e={e} data={data} mut={mut} />)}
       </div>
@@ -1209,12 +1333,12 @@ function LedgerView({ data, mut }) {
 
 function ViewTabs({ view, setView, tabs }) {
   return (
-    <nav className="max-w-3xl mx-auto flex gap-1 overflow-x-auto px-4 pt-3">
+    <nav className="custom-scrollbar mx-auto flex w-full max-w-6xl gap-1.5 overflow-x-auto px-4 pt-3">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => setView(t.id)}
-          className={'shrink-0 whitespace-nowrap rounded-t px-3 py-1.5 text-xs font-medium ' + (view === t.id ? 'bg-neutral-900 text-neutral-100 border-b-2 border-neutral-100' : 'text-neutral-400 hover:text-neutral-200')}
+          className={'shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 ' + (view === t.id ? 'border-indigo-500/40 bg-indigo-500/20 text-indigo-200' : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200')}
         >
           {t.label}
         </button>
@@ -1234,12 +1358,12 @@ function QuickAddGuardianInline({ onAdd, originStageId, placeholder }) {
     setImportance('wobbles')
   }
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-2">
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} className={fieldCls + ' flex-1 min-w-[200px]'} />
+    <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-slate-700/50 pt-2.5">
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} className={fieldCls + ' min-w-[200px] flex-1'} />
       <select value={importance} onChange={(e) => setImportance(e.target.value)} className={selectCls}>
         {IMPORTANCE_OPTS.map((o) => <option key={o.v} value={o.v}>{o.v}</option>)}
       </select>
-      <button onClick={submit} disabled={!text.trim()} className="rounded bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-100 hover:bg-neutral-700 disabled:opacity-40">
+      <button onClick={submit} disabled={!text.trim()} className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1.5 text-xs font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20 disabled:opacity-40">
         + guardian
       </button>
     </div>
@@ -1250,17 +1374,17 @@ function QuickAddGuardianInline({ onAdd, originStageId, placeholder }) {
 function FuneralPicker({ data, mut }) {
   const open = data.assumptions.filter((a) => a.status === 'untested' || a.status === 'testing')
   if (!open.length) {
-    return <p className="mt-2 text-2xs italic text-neutral-500">No open guardians to bury yet. Register your Stage-1 beliefs first, then return here.</p>
+    return <p className="mt-2 text-2xs italic text-slate-500">No open guardians to bury yet. Register your Stage-1 beliefs first, then return here.</p>
   }
   return (
     <div className="mt-2 space-y-1.5">
       {open.map((a) => (
-        <div key={a.id} className="flex items-center justify-between gap-2 rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5">
-          <span className="text-xs text-neutral-200">
+        <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-700/50 bg-slate-800/40 px-2.5 py-1.5">
+          <span className="text-xs text-slate-200">
             {a.statement}
-            {a.originStageId === 's1' && <span className="ml-1.5 text-2xs text-neutral-500">· Stage 1</span>}
+            {a.originStageId === 's1' && <span className="ml-1.5 text-2xs text-slate-500">· Stage 1</span>}
           </span>
-          <button onClick={() => mut.updateGuardian(a.id, { status: 'invalidated' })} className="shrink-0 rounded border border-rose-700 bg-rose-900/50 px-2 py-0.5 text-2xs text-rose-200 hover:bg-rose-900">
+          <button onClick={() => mut.updateGuardian(a.id, { status: 'invalidated' })} className="shrink-0 rounded-lg border border-rose-700 bg-rose-900/50 px-2 py-0.5 text-2xs text-rose-200 transition-colors hover:bg-rose-900">
             Hold the funeral
           </button>
         </div>
@@ -1285,8 +1409,8 @@ function DecisionInput({ answer, onPatch, data }) {
             onClick={() => !locked && onPatch({ decision: d })}
             disabled={locked}
             className={
-              'rounded border px-3 py-1.5 text-sm capitalize ' +
-              (decision === d ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300') +
+              'rounded-lg border px-3.5 py-1.5 text-sm font-semibold capitalize transition-colors ' +
+              (decision === d ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800') +
               (locked ? ' cursor-not-allowed opacity-40' : '')
             }
           >
@@ -1295,15 +1419,15 @@ function DecisionInput({ answer, onPatch, data }) {
         ))}
       </div>
       <div>
-        <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">
+        <div className="mb-1 text-2xs font-bold uppercase tracking-wider text-slate-500">
           Cite the evidence that decides it {locked && <span className="text-amber-300">· required to unlock</span>}
         </div>
         {data.evidence.length === 0 ? (
-          <p className="text-2xs italic text-neutral-500">No ledger entries yet — the decision stays locked until at least one citation.</p>
+          <p className="text-2xs italic text-slate-500">No ledger entries yet — the decision stays locked until at least one citation.</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {data.evidence.map((e) => (
-              <button key={e.id} onClick={() => toggleCite(e.id)} className={'rounded border px-2 py-0.5 text-2xs ' + (cited.includes(e.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}>
+              <button key={e.id} onClick={() => toggleCite(e.id)} className={'rounded-full border px-2 py-0.5 text-2xs transition-colors ' + (cited.includes(e.id) ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:border-slate-500')}>
                 E{e.tier} · {e.text.slice(0, 24)}{e.text.length > 24 ? '…' : ''}
               </button>
             ))}
@@ -1369,16 +1493,16 @@ function VaultView({ data }) {
   return (
     <section className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <h2 className="text-xl font-semibold tracking-tight">The Vault</h2>
-      <p className="mt-1 text-sm text-neutral-400">Solution ideas you captured in Act I — sealed until Stage 3, so the problem gets its due first.</p>
+      <p className="mt-1 text-sm text-slate-400">Solution ideas you captured in Act I — sealed until Stage 3, so the problem gets its due first.</p>
       {!data.vaultUnlocked && (
         <div className="mt-3 flex items-center gap-2 rounded border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
           <Lock size={14} /> Sealed until Stage 3 — reach The Phoenix to open it.
         </div>
       )}
       <div className={'mt-4 space-y-2 ' + (data.vaultUnlocked ? '' : 'vault-blur')}>
-        {data.vault.length === 0 && <p className="text-sm italic text-neutral-500">Nothing captured yet. When a solution word slips out in Act I, the Vault will offer to hold it.</p>}
+        {data.vault.length === 0 && <p className="text-sm italic text-slate-500">Nothing captured yet. When a solution word slips out in Act I, the Vault will offer to hold it.</p>}
         {data.vault.map((v) => (
-          <div key={v.id} className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-200">{v.text}</div>
+          <div key={v.id} className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3 text-sm text-slate-200">{v.text}</div>
         ))}
       </div>
     </section>
@@ -1390,18 +1514,18 @@ function VaultPicker({ answer, onPatch, data, mut }) {
     return (
       <div className="mt-2">
         <button onClick={mut.unsealVault} className={primaryBtn}>Unseal the Vault</button>
-        <p className="mt-1 text-2xs text-neutral-500">The Phoenix — Stage 3 opens what Act I sealed.</p>
+        <p className="mt-1 text-2xs text-slate-500">The Phoenix — Stage 3 opens what Act I sealed.</p>
       </div>
     )
   }
-  if (data.vault.length === 0) return <p className="mt-2 text-2xs italic text-neutral-500">The Vault is empty — no captured ideas to choose from.</p>
+  if (data.vault.length === 0) return <p className="mt-2 text-2xs italic text-slate-500">The Vault is empty — no captured ideas to choose from.</p>
   return (
     <div className="mt-2 space-y-1.5">
       {data.vault.map((v) => (
         <button
           key={v.id}
           onClick={() => onPatch({ vaultId: v.id })}
-          className={'block w-full rounded border px-2.5 py-1.5 text-left text-sm ' + (answer.vaultId === v.id ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-200 hover:border-neutral-500')}
+          className={'block w-full rounded border px-2.5 py-1.5 text-left text-sm ' + (answer.vaultId === v.id ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-200 hover:border-slate-500')}
         >
           {v.text}
         </button>
@@ -1416,8 +1540,8 @@ function ThreadSeal({ answer, onPatch, mut, stageId, qid }) {
     return (
       <div className="mt-2 rounded border border-emerald-800 bg-emerald-950/30 p-3">
         <div className="flex items-center gap-2 text-2xs uppercase tracking-wider text-emerald-300"><Anchor size={12} /> Sealed {d10(answer.sealedAt)}</div>
-        <p className="mt-1.5 whitespace-pre-wrap text-sm text-neutral-100">{answer.text}</p>
-        <p className="mt-1 text-2xs text-neutral-500">Ariadne's Thread is locked. The verdict is recorded in Stage 5, before you interpret anything.</p>
+        <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-100">{answer.text}</p>
+        <p className="mt-1 text-2xs text-slate-500">Ariadne's Thread is locked. The verdict is recorded in Stage 5, before you interpret anything.</p>
       </div>
     )
   }
@@ -1431,7 +1555,7 @@ function ThreadSeal({ answer, onPatch, mut, stageId, qid }) {
           <p className="text-xs text-amber-200">Sealing locks this and timestamps it — you can't edit it afterward. That's the point: the kill criterion is fixed before results exist.</p>
           <div className="mt-2 flex gap-2">
             <button onClick={() => { mut.sealThread(stageId, qid); setConfirming(false) }} className="rounded bg-amber-200 px-3 py-1.5 text-xs font-medium text-amber-950">Seal it</button>
-            <button onClick={() => setConfirming(false)} className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300">Cancel</button>
+            <button onClick={() => setConfirming(false)} className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Cancel</button>
           </div>
         </div>
       )}
@@ -1445,9 +1569,9 @@ function VerdictInput({ answer, data, mut, stageId, qid }) {
   return (
     <div className="mt-2 space-y-2">
       {sealedText ? (
-        <div className="rounded border border-neutral-700 bg-neutral-900 p-2.5">
-          <div className="text-2xs uppercase tracking-wider text-neutral-500">Ariadne's Thread — sealed {d10(thread.sealedAt)}</div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-100">{sealedText}</p>
+        <div className="rounded border border-slate-700 bg-slate-900 p-2.5">
+          <div className="text-2xs uppercase tracking-wider text-slate-500">Ariadne's Thread — sealed {d10(thread.sealedAt)}</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-100">{sealedText}</p>
         </div>
       ) : (
         <p className="text-2xs italic text-amber-300">No sealed Thread yet — seal your stop/pivot result in Stage 4 first.</p>
@@ -1458,13 +1582,13 @@ function VerdictInput({ answer, data, mut, stageId, qid }) {
             key={v}
             onClick={() => mut.setVerdict(stageId, qid, v)}
             disabled={!sealedText}
-            className={'rounded border px-3 py-1.5 text-sm ' + (answer.verdict === v ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300') + (!sealedText ? ' cursor-not-allowed opacity-40' : '')}
+            className={'rounded border px-3 py-1.5 text-sm ' + (answer.verdict === v ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-300') + (!sealedText ? ' cursor-not-allowed opacity-40' : '')}
           >
             {label}
           </button>
         ))}
       </div>
-      {answer.verdict && <p className="text-2xs text-neutral-400">Verdict recorded before interpretation. This is the moment to convene the Council.</p>}
+      {answer.verdict && <p className="text-2xs text-slate-400">Verdict recorded before interpretation. This is the moment to convene the Council.</p>}
     </div>
   )
 }
@@ -1482,14 +1606,14 @@ function SpineInput({ answer, onPatch, data }) {
     <div className="mt-2 space-y-3">
       {SPINE_BEATS.map((b) => (
         <div key={b.k}>
-          <div className="text-2xs uppercase tracking-wider text-neutral-500">{b.label} <span className="text-neutral-600">{b.hint}</span></div>
+          <div className="text-2xs uppercase tracking-wider text-slate-500">{b.label} <span className="text-slate-600">{b.hint}</span></div>
           <input value={beats[b.k]?.text || ''} onChange={(e) => setBeat(b.k, { text: e.target.value })} placeholder={b.hint} className={fieldCls + ' mt-1'} />
           {(beats[b.k]?.text || '').trim() && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
-              <span className="text-2xs text-neutral-600">cite:</span>
+              <span className="text-2xs text-slate-600">cite:</span>
               {data.evidence.length === 0 && <span className="text-2xs text-amber-300">no ledger entries yet</span>}
               {data.evidence.map((e) => (
-                <button key={e.id} onClick={() => toggleCite(b.k, e.id)} title={e.text} className={'rounded border px-1.5 py-0.5 text-2xs ' + ((beats[b.k]?.cites || []).includes(e.id) ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-400 hover:border-neutral-500')}>E{e.tier}</button>
+                <button key={e.id} onClick={() => toggleCite(b.k, e.id)} title={e.text} className={'rounded border px-1.5 py-0.5 text-2xs ' + ((beats[b.k]?.cites || []).includes(e.id) ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-400 hover:border-slate-500')}>E{e.tier}</button>
               ))}
             </div>
           )}
@@ -1512,19 +1636,19 @@ function GatePanel({ gateId, data, mut }) {
   const allMet = results.every((r) => r.met)
   const state = data.gates[gateId]
   return (
-    <div className="mt-8 rounded-lg border border-neutral-700 bg-neutral-900/60 p-4">
-      <div className="text-2xs uppercase tracking-[0.2em] text-neutral-500">⛩ Threshold</div>
-      <h3 className="text-base font-semibold text-neutral-100">{g.title}</h3>
+    <div className="mt-8 rounded-xl border border-slate-700 bg-slate-800/60 p-4">
+      <div className="text-2xs uppercase tracking-[0.2em] text-slate-500">⛩ Threshold</div>
+      <h3 className="text-base font-semibold text-slate-100">{g.title}</h3>
       <ul className="mt-2 space-y-1">
         {results.map((r, i) => (
           <li key={i} className="flex items-center gap-2 text-sm">
-            <span className={r.met ? 'text-emerald-400' : 'text-neutral-600'}>{r.met ? '✓' : '○'}</span>
-            <span className={r.met ? 'text-neutral-200' : 'text-neutral-400'}>{r.label}</span>
+            <span className={r.met ? 'text-emerald-400' : 'text-slate-600'}>{r.met ? '✓' : '○'}</span>
+            <span className={r.met ? 'text-slate-200' : 'text-slate-400'}>{r.label}</span>
           </li>
         ))}
       </ul>
       {state ? (
-        <p className="mt-3 text-xs text-neutral-400">
+        <p className="mt-3 text-xs text-slate-400">
           {state.status === 'passed' ? 'Crossed' : 'Overridden'}{state.date ? ` · ${d10(state.date)}` : ''}
           {state.reason ? ` — "${state.reason}"` : ''}
         </p>
@@ -1575,29 +1699,29 @@ function dinnerToMd(s) {
 function WeatherCheckin({ data, mut }) {
   const today = data.weather.find((w) => d10(w.date) === todayKey())
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-      <h3 className="text-sm font-semibold text-neutral-100">Today's weather</h3>
-      <p className="text-2xs text-neutral-500">One tap, once a day. Yours alone — it sets the Council's cadence.</p>
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+      <h3 className="text-sm font-semibold text-slate-100">Today's weather</h3>
+      <p className="text-2xs text-slate-500">One tap, once a day. Yours alone — it sets the Council's cadence.</p>
       <div className="mt-2 flex gap-1.5">
         {WEATHER.map((w) => (
           <button
             key={w.v}
             onClick={() => mut.setWeather(w.v)}
-            className={'flex-1 rounded border px-2 py-2 text-center text-2xs ' + (today && today.value === w.v ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-700 text-neutral-300 hover:border-neutral-500')}
+            className={'flex-1 rounded border px-2 py-2 text-center text-2xs ' + (today && today.value === w.v ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:border-slate-500')}
           >
             <div className="text-base font-semibold">{w.v}</div>
             {w.name}
           </button>
         ))}
       </div>
-      {today && <p className="mt-2 text-2xs text-neutral-400">Logged today: {WEATHER[today.value - 1].name}.</p>}
+      {today && <p className="mt-2 text-2xs text-slate-400">Logged today: {WEATHER[today.value - 1].name}.</p>}
     </div>
   )
 }
 
 function TroughBanner() {
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-3">
+    <div className="mx-auto w-full max-w-6xl px-4 pt-3">
       <div className="rounded border border-sky-800 bg-sky-950/40 px-3 py-2 text-xs text-sky-200">
         This stretch is on the map — the mid-journey winter. It's the trough, not your failure. The Shadow holds its fire. Try a Side Quest, or just log the weather and rest.
       </div>
@@ -1608,14 +1732,14 @@ function TroughBanner() {
 function SideQuestCard({ q, state, mut }) {
   const done = !!(state && state.completedAt)
   return (
-    <div className={'rounded-lg border p-3 ' + (done ? 'border-emerald-800 bg-emerald-950/20' : 'border-neutral-800 bg-neutral-900/40')}>
+    <div className={'rounded-lg border p-3 ' + (done ? 'border-emerald-800 bg-emerald-950/20' : 'border-slate-800 bg-slate-900/40')}>
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-neutral-100">{q.name}</h4>
-        <span className="text-2xs text-neutral-500">+5 XP</span>
+        <h4 className="text-sm font-medium text-slate-100">{q.name}</h4>
+        <span className="text-2xs text-slate-500">+5 XP</span>
       </div>
-      <p className="mt-1 text-2xs text-neutral-400">{q.desc}</p>
+      <p className="mt-1 text-2xs text-slate-400">{q.desc}</p>
       {!state ? (
-        <button onClick={() => mut.startSideQuest(q.id)} className="mt-2 rounded bg-neutral-800 px-2.5 py-1 text-xs text-neutral-100 hover:bg-neutral-700">Start</button>
+        <button onClick={() => mut.startSideQuest(q.id)} className="mt-2 rounded bg-slate-800 px-2.5 py-1 text-xs text-slate-100 hover:bg-slate-700">Start</button>
       ) : (
         <>
           <textarea value={state.text || ''} onChange={(e) => mut.setSideQuestText(q.id, e.target.value)} placeholder="Your work here." rows={2} className={fieldCls + ' mt-2'} />
@@ -1651,11 +1775,11 @@ function LoopCard({ loop, mut }) {
     setCritique('')
   }
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-      <h4 className="text-sm font-medium text-neutral-100">
-        {loop.name} <span className="text-2xs text-neutral-500">Stage {loop.fromId.slice(1)} → {loop.toId.slice(1)}</span>
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+      <h4 className="text-sm font-medium text-slate-100">
+        {loop.name} <span className="text-2xs text-slate-500">Stage {loop.fromId.slice(1)} → {loop.toId.slice(1)}</span>
       </h4>
-      <p className="mt-1 text-2xs text-neutral-400">{loop.desc}</p>
+      <p className="mt-1 text-2xs text-slate-400">{loop.desc}</p>
       <input value={learning} onChange={(e) => setLearning(e.target.value)} placeholder="One learning line — required." className={fieldCls + ' mt-2'} />
       {isReset && (
         <>
@@ -1677,28 +1801,28 @@ function TrailView({ data, mut }) {
         <div className="mt-3"><WeatherCheckin data={data} mut={mut} /></div>
       </div>
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
           Side Quests {trough && <span className="text-sky-300">· surfaced in the trough</span>}
         </h3>
-        <p className="text-2xs text-neutral-500">Designed serendipity. +5 XP each.</p>
+        <p className="text-2xs text-slate-500">Designed serendipity. +5 XP each.</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {SIDE_QUESTS.map((q) => <SideQuestCard key={q.id} q={q} state={data.sideQuests[q.id]} mut={mut} />)}
         </div>
       </div>
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">Loops</h3>
-        <p className="text-2xs text-neutral-500">Every loop demands one learning line. Returning is not failure — it's the map redrawn.</p>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Loops</h3>
+        <p className="text-2xs text-slate-500">Every loop demands one learning line. Returning is not failure — it's the map redrawn.</p>
         <div className="mt-2 space-y-2">
           {LOOPS.map((l) => <LoopCard key={l.name} loop={l} mut={mut} />)}
         </div>
       </div>
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">The Trail</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">The Trail</h3>
         <div className="mt-2 space-y-1.5">
-          {data.trail.length === 0 && <p className="text-sm italic text-neutral-500">No loops or gate crossings yet.</p>}
+          {data.trail.length === 0 && <p className="text-sm italic text-slate-500">No loops or gate crossings yet.</p>}
           {[...data.trail].reverse().map((t, i) => (
-            <div key={i} className="rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5 text-xs text-neutral-300">
-              <span className="text-neutral-500">{d10(t.date)} · {t.type}</span> — {t.name}
+            <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-300">
+              <span className="text-slate-500">{d10(t.date)} · {t.type}</span> — {t.name}
               {t.learning ? ` — learning: ${t.learning}` : ''}
               {t.critique ? ` — ${t.critique}` : ''}
             </div>
@@ -1731,15 +1855,15 @@ function DinnerSession({ s, mut }) {
   }
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-        <div className="font-mono text-2xl tabular-nums text-neutral-100">{mm}:{ss}</div>
-        <button onClick={() => setRunning((r) => !r)} className="rounded bg-neutral-800 px-2.5 py-1 text-xs text-neutral-100 hover:bg-neutral-700">{running ? 'Pause' : 'Start'} timer</button>
-        <span className="text-2xs text-neutral-500">90 minutes, tops.</span>
-        <button onClick={() => downloadText('family-dinner.md', dinnerToMd(s))} className="rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500">Export this dinner</button>
-        <button onClick={mut.endDinner} className="ml-auto rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500">End dinner</button>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+        <div className="font-mono text-2xl tabular-nums text-slate-100">{mm}:{ss}</div>
+        <button onClick={() => setRunning((r) => !r)} className="rounded bg-slate-800 px-2.5 py-1 text-xs text-slate-100 hover:bg-slate-700">{running ? 'Pause' : 'Start'} timer</button>
+        <span className="text-2xs text-slate-500">90 minutes, tops.</span>
+        <button onClick={() => downloadText('family-dinner.md', dinnerToMd(s))} className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500">Export this dinner</button>
+        <button onClick={mut.endDinner} className="ml-auto rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500">End dinner</button>
       </div>
-      <div className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-        <div className="text-2xs uppercase tracking-wider text-neutral-500">Add a card to the table</div>
+      <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+        <div className="text-2xs uppercase tracking-wider text-slate-500">Add a card to the table</div>
         <div className="flex flex-wrap gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={fieldCls + ' flex-1 min-w-[120px]'} />
           <select value={bucket} onChange={(e) => setBucket(e.target.value)} className={selectCls}>
@@ -1750,24 +1874,24 @@ function DinnerSession({ s, mut }) {
         <button onClick={addCard} disabled={!name.trim()} className={primaryBtn}>Add to the table</button>
       </div>
       <div className="space-y-1.5">
-        {s.cards.length === 0 && <p className="text-sm italic text-neutral-500">No cards on the table yet.</p>}
+        {s.cards.length === 0 && <p className="text-sm italic text-slate-500">No cards on the table yet.</p>}
         {s.cards.map((c) => (
-          <div key={c.id} className="flex items-center gap-2 rounded border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5">
+          <div key={c.id} className="flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/40 px-2.5 py-1.5">
             <button
               onClick={() => mut.updateDinnerCard(c.id, { spoke: !c.spoke })}
               title="mark as spoken"
-              className={'flex h-4 w-4 shrink-0 items-center justify-center rounded border ' + (c.spoke ? 'border-neutral-100 bg-neutral-100 text-neutral-900' : 'border-neutral-600')}
+              className={'flex h-4 w-4 shrink-0 items-center justify-center rounded border ' + (c.spoke ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-slate-600')}
             >
               {c.spoke && <Check size={11} strokeWidth={3} />}
             </button>
             <div className="min-w-0 flex-1">
-              <div className="text-sm text-neutral-100">{c.name} <span className="text-2xs text-neutral-500">· {c.bucket}</span></div>
-              {c.text && <div className="truncate text-2xs text-neutral-400">{c.text}</div>}
+              <div className="text-sm text-slate-100">{c.name} <span className="text-2xs text-slate-500">· {c.bucket}</span></div>
+              {c.text && <div className="truncate text-2xs text-slate-400">{c.text}</div>}
             </div>
           </div>
         ))}
       </div>
-      <p className="text-2xs text-neutral-500">{s.cards.filter((c) => c.spoke).length}/{s.cards.length} have spoken.</p>
+      <p className="text-2xs text-slate-500">{s.cards.filter((c) => c.spoke).length}/{s.cards.length} have spoken.</p>
     </div>
   )
 }
@@ -1778,20 +1902,20 @@ function DinnerView({ data, mut }) {
     <section className="max-w-3xl mx-auto space-y-4 px-4 pt-4 pb-24">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Family Dinner</h2>
-        <p className="mt-1 text-sm text-neutral-400">Facilitator mode. What's said at dinner stays at dinner — none of this is ever exported to your Journal, Brief, or the Council. The only way out is the explicit button below.</p>
+        <p className="mt-1 text-sm text-slate-400">Facilitator mode. What's said at dinner stays at dinner — none of this is ever exported to your Journal, Brief, or the Council. The only way out is the explicit button below.</p>
       </div>
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-        <h3 className="text-sm font-medium text-neutral-100">Going wrong right now</h3>
-        <p className="text-2xs text-neutral-500">Your own card. This one line leads your Quest Brief.</p>
+      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+        <h3 className="text-sm font-medium text-slate-100">Going wrong right now</h3>
+        <p className="text-2xs text-slate-500">Your own card. This one line leads your Quest Brief.</p>
         <textarea value={data.dinnerCard?.text || ''} onChange={(e) => mut.setDinnerCard(e.target.value)} placeholder="What's going wrong for you right now." rows={2} className={fieldCls + ' mt-2'} />
       </div>
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-xs text-neutral-300">
-        <div className="mb-1 text-2xs uppercase tracking-wider text-neutral-500">Rules of the table</div>
+      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4 text-xs text-slate-300">
+        <div className="mb-1 text-2xs uppercase tracking-wider text-slate-500">Rules of the table</div>
         No bragging · share what's going wrong · everyone talks · if you can help, help.
-        <div className="mt-1 text-2xs text-neutral-500">Buckets: Been there (pair them) · Now that's interesting (rally) · Do not pass Go (route around it).</div>
+        <div className="mt-1 text-2xs text-slate-500">Buckets: Been there (pair them) · Now that's interesting (rally) · Do not pass Go (route around it).</div>
       </div>
       {!s ? <button onClick={mut.startDinner} className={primaryBtn}>Start a dinner</button> : <DinnerSession s={s} mut={mut} />}
-      {data.dinnerLog.length > 0 && <p className="text-2xs text-neutral-500">{data.dinnerLog.length} past dinner{data.dinnerLog.length > 1 ? 's' : ''} logged (local only, never exported).</p>}
+      {data.dinnerLog.length > 0 && <p className="text-2xs text-slate-500">{data.dinnerLog.length} past dinner{data.dinnerLog.length > 1 ? 's' : ''} logged (local only, never exported).</p>}
     </section>
   )
 }
@@ -1824,8 +1948,8 @@ function ConsentGate({ onConsent }) {
   return (
     <section className="mx-auto max-w-3xl px-4 pt-4 pb-24">
       <h2 className="text-xl font-semibold tracking-tight">The Council</h2>
-      <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-        <p className="text-sm text-neutral-200">{COUNCIL_CONSENT}</p>
+      <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+        <p className="text-sm text-slate-200">{COUNCIL_CONSENT}</p>
         <button onClick={onConsent} className={primaryBtn + ' mt-3'}>I understand — set up the Council</button>
       </div>
     </section>
@@ -1915,22 +2039,22 @@ function CouncilView({ data, mut }) {
     <section className="mx-auto max-w-3xl space-y-4 px-4 pt-4 pb-24">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">The Council</h2>
-        <p className="mt-1 text-sm text-neutral-400">{COUNCIL_CAPTION}</p>
+        <p className="mt-1 text-sm text-slate-400">{COUNCIL_CAPTION}</p>
       </div>
 
       {/* BYOK key */}
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-        <h3 className="text-sm font-medium text-neutral-100">Your key</h3>
-        <p className="text-2xs text-neutral-500">Bring your own Anthropic key. It stays in your browser, rides one request to the model, and is never stored on a server or written to logs.</p>
+      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+        <h3 className="text-sm font-medium text-slate-100">Your key</h3>
+        <p className="text-2xs text-slate-500">Bring your own Anthropic key. It stays in your browser, rides one request to the model, and is never stored on a server or written to logs.</p>
         {hasKey ? (
-          <div className="mt-2 flex items-center gap-2 text-xs text-neutral-300">
+          <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
             <span className="rounded bg-emerald-900/40 px-2 py-0.5 text-emerald-300">key set{remember ? ' · remembered on this device' : ' · this session only'}</span>
-            <button onClick={forgetKey} className="text-2xs text-neutral-500 hover:text-rose-400">forget key</button>
+            <button onClick={forgetKey} className="text-2xs text-slate-500 hover:text-rose-400">forget key</button>
           </div>
         ) : (
           <input type="password" value={key} onChange={(e) => onKey(e.target.value)} placeholder="sk-ant-…" className={fieldCls + ' mt-2'} />
         )}
-        <label className="mt-2 flex items-center gap-2 text-2xs text-neutral-400">
+        <label className="mt-2 flex items-center gap-2 text-2xs text-slate-400">
           <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
           Remember on this device (otherwise the key is forgotten when you close the tab)
         </label>
@@ -1939,7 +2063,7 @@ function CouncilView({ data, mut }) {
       {/* mode */}
       <div className="flex gap-1 text-xs">
         {[['live', 'Live record'], ['paste', 'Paste a journal']].map(([m, label]) => (
-          <button key={m} onClick={() => setMode(m)} className={'rounded px-3 py-1.5 ' + (mode === m ? 'bg-neutral-100 text-neutral-900' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800')}>{label}</button>
+          <button key={m} onClick={() => setMode(m)} className={'rounded px-3 py-1.5 ' + (mode === m ? 'bg-indigo-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800')}>{label}</button>
         ))}
       </div>
       {mode === 'paste' && (
@@ -1947,8 +2071,8 @@ function CouncilView({ data, mut }) {
       )}
 
       {(showModel || model !== 'claude-fable-5') && (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-          <div className="text-2xs uppercase tracking-wider text-neutral-500">Model — pick one your key can reach</div>
+        <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+          <div className="text-2xs uppercase tracking-wider text-slate-500">Model — pick one your key can reach</div>
           <select value={model} onChange={(e) => setModel(e.target.value)} className={selectCls + ' mt-1'}>
             {COUNCIL_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
@@ -1966,10 +2090,10 @@ function CouncilView({ data, mut }) {
 
       {/* latest reading + commitment gate + follow-ups */}
       {latest && (
-        <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 p-4">
-          <div className="text-2xs uppercase tracking-wider text-neutral-500">Reading · {d10(latest.date)} · {latest.source}</div>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-100">{latest.reading}</p>
-          <div className="mt-3 border-t border-neutral-800 pt-3">
+        <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-4">
+          <div className="text-2xs uppercase tracking-wider text-slate-500">Reading · {d10(latest.date)} · {latest.source}</div>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-100">{latest.reading}</p>
+          <div className="mt-3 border-t border-slate-800 pt-3">
             {!latest.commitment ? (
               <>
                 <p className="text-xs text-amber-200">{COUNCIL_COMMITMENT}</p>
@@ -1977,11 +2101,11 @@ function CouncilView({ data, mut }) {
               </>
             ) : (
               <>
-                <p className="text-2xs text-neutral-400">You committed to change: <span className="text-neutral-200">{latest.commitment}</span></p>
+                <p className="text-2xs text-slate-400">You committed to change: <span className="text-slate-200">{latest.commitment}</span></p>
                 {(latest.followups || []).map((f, i) => (
                   <div key={i} className="mt-2">
-                    <p className="text-xs font-medium text-neutral-200">{f.q}</p>
-                    <p className="whitespace-pre-wrap text-xs text-neutral-300">{f.a}</p>
+                    <p className="text-xs font-medium text-slate-200">{f.q}</p>
+                    <p className="whitespace-pre-wrap text-xs text-slate-300">{f.a}</p>
                   </div>
                 ))}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1995,16 +2119,105 @@ function CouncilView({ data, mut }) {
       )}
 
       {data.council.length > 1 && (
-        <p className="text-2xs text-neutral-500">{data.council.length} readings saved (with their journal snapshots) — all carried in your Journal export.</p>
+        <p className="text-2xs text-slate-500">{data.council.length} readings saved (with their journal snapshots) — all carried in your Journal export.</p>
       )}
     </section>
+  )
+}
+
+/* ═══ The Guide — framework reference + sources (canon 01 lineage) ═══════ */
+function FrameworkGuide({ open, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+  if (!open) return null
+  const h = 'mb-3 text-xs font-bold uppercase tracking-widest text-indigo-300'
+  return (
+    <div className="fade-in fixed inset-0 z-modal flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="The Founder's Quest guide">
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="enter-anim custom-scrollbar max-h-85 relative z-10 w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-6 py-5 backdrop-blur sm:px-8">
+          <div className="flex items-center gap-3">
+            <Compass className="h-6 w-6 text-indigo-400" />
+            <div>
+              <h2 className="text-lg font-bold text-white">Founder's Quest</h2>
+              <p className="text-2xs uppercase tracking-widest text-slate-500">Genesis Framework · the crucible</p>
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close guide" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-8 px-6 py-6 sm:px-8">
+          <section>
+            <h3 className={h}>Prime directive</h3>
+            <blockquote className="border-l-2 border-indigo-500/50 pl-4 text-sm italic leading-relaxed text-slate-300">
+              Progress is validated learning, not completed checkboxes. The founder is the hero of the quest; the customer is the hero of the story; the app is the mentor — and a mentor's love is measured by the questions it refuses to let you skip.
+            </blockquote>
+          </section>
+
+          <section>
+            <h3 className={h}>The monomyth arc</h3>
+            <ol className="space-y-1.5">
+              {STAGES.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-2xs font-bold text-indigo-300">{s.n}</span>
+                  <span className="font-semibold text-white">{s.name}</span>
+                  <span className="text-slate-600">→</span>
+                  <span className="italic text-indigo-300">{s.myth}</span>
+                  <span className="text-2xs text-slate-500">· {s.symbol}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section>
+            <h3 className={h}>Evidence &amp; Truth</h3>
+            <div className="space-y-2 text-sm leading-relaxed text-slate-300">
+              <p>Every claim carries a tier: <span className="font-semibold text-slate-100">E0 Hunch · E1 Heard · E2 Said · E3 Seen · E4 Paid</span>. Only E2 and above moves Truth — hunches are decoration until tested.</p>
+              <p>Guardians (your assumptions) never grade their own proof: their tier is derived from the evidence you link to them. Invalidating a belief pays 1.5× what validating one does — killed assumptions make the map truer.</p>
+              <p>Gates warn, never block. Crossing unmet requires a written reason, logged to your trail and carried in every export.</p>
+            </div>
+          </section>
+
+          <section>
+            <h3 className={h}>Named loops</h3>
+            <div className="space-y-2">
+              {LOOPS.map((l) => (
+                <div key={l.name} className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-pink-300"><Repeat size={13} /> {l.name}</span>
+                    <span className="rounded-full bg-slate-950/60 px-2 py-0.5 text-2xs font-medium uppercase tracking-wider text-slate-400">Stage {l.fromId.slice(1)} → {l.toId.slice(1)}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{l.desc}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className={h}>Sources &amp; lineage</h3>
+            <div className="space-y-2 text-xs leading-relaxed text-slate-400">
+              <p>The Genesis Framework is the parent framework; the Hero's Journey adaptation and this mythic architecture are house canon.</p>
+              <p>Adapted from the PIE Cookbook by PIE (piepdx.com), CC BY 4.0 — the rollercoaster map, Family Dinner rules, one-way feedback, and the Side Quest pattern.</p>
+              <p>"Intuition is recognition" — Herbert Simon. The illusion of validity — Kahneman, <em>Thinking, Fast and Slow</em> (2011). The conditions for trusting expert intuition — Kahneman &amp; Klein (2009).</p>
+              <p>Method owes debts to Fitzpatrick (the Mom Test), Moesta &amp; Christensen (JTBD), Klein (pre-mortem), Rumelt (the strategy kernel), and Paul Graham (default alive).</p>
+              <p>Content is CC BY 4.0 via the Founder's Quest Cookbook. Your data lives in this browser and nowhere else — data minimization is a design choice.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
   )
 }
 
 /* ── app root ─────────────────────────────────────────────────────────── */
 const VIEW_TABS = [
   { id: 'quest', label: 'Quest' },
-  { id: 'registry', label: 'Registry' },
+  { id: 'registry', label: 'Guardians' },
   { id: 'ledger', label: 'Ledger' },
   { id: 'vault', label: 'Vault' },
   { id: 'council', label: 'Council' },
@@ -2017,24 +2230,42 @@ export default function App() {
   const { data, persistent } = mut
   const [view, setView] = useState('quest')
   const [current, setCurrent] = useState('s1')
+  const [showGuide, setShowGuide] = useState(false)
+  const activeStage = STAGES.find((s) => s.id === current)
   // Reaching Stage 3 (The Phoenix) unseals the Vault — canon 03.
   useEffect(() => {
     if (view === 'quest' && current === 's3' && !data.vaultUnlocked) mut.unsealVault()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, current, data.vaultUnlocked])
+  const resetAll = () => { mut.resetQuest(); setView('quest'); setCurrent('s1') }
   return (
     <>
       <QuestStyles />
       {!persistent && <StorageBanner />}
-      <div className="min-h-screen bg-neutral-950 text-neutral-100">
-        <ProgressHeader data={data} />
+      <div className="flex min-h-screen flex-col bg-slate-950 font-sans text-slate-100 selection:bg-indigo-500/30">
+        <Header data={data} onOpenGuide={() => setShowGuide(true)} onReset={resetAll} />
         <ViewTabs view={view} setView={setView} tabs={VIEW_TABS} />
         {inTrough(data) && <TroughBanner />}
         {view === 'quest' && (
-          <>
-            <StageRail current={current} setCurrent={setCurrent} data={data} />
-            <StageView stageId={current} data={data} mut={mut} />
-          </>
+          <main className="mx-auto grid w-full max-w-6xl flex-grow grid-cols-1 gap-8 px-4 py-6 lg:grid-cols-12">
+            <aside className="flex flex-col items-center lg:col-span-5">
+              <div className="mb-5 flex w-full max-w-md items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400"><MapIcon size={16} /> The Mythic Journey</h2>
+                <button onClick={() => setShowGuide(true)} className="inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-2xs font-semibold uppercase tracking-wider text-indigo-300 transition-colors hover:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950"><Info size={13} /> Framework</button>
+              </div>
+              <MythicGrid current={current} setCurrent={setCurrent} data={data} />
+              <div className="relative mt-8 w-full max-w-md overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 backdrop-blur-sm">
+                <div className="absolute left-0 top-0 h-full w-1 bg-indigo-500/50" />
+                <p className="text-sm italic leading-relaxed text-slate-400">
+                  "The founder is the hero of the quest. The customer is the hero of the story. Progress is validated learning — killed assumptions are the treasure."
+                </p>
+              </div>
+            </aside>
+            <article className="lg:col-span-7">
+              <TrailBar current={activeStage} lastLoop={data.lastLoop} onGo={setCurrent} />
+              <StageView stageId={current} data={data} mut={mut} />
+            </article>
+          </main>
         )}
         {view === 'registry' && <RegistryView data={data} mut={mut} />}
         {view === 'ledger' && <LedgerView data={data} mut={mut} />}
@@ -2043,6 +2274,7 @@ export default function App() {
         {view === 'trail' && <TrailView data={data} mut={mut} />}
         {view === 'dinner' && <DinnerView data={data} mut={mut} />}
       </div>
+      <FrameworkGuide open={showGuide} onClose={() => setShowGuide(false)} />
     </>
   )
 }
