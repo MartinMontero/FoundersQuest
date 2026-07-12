@@ -32,7 +32,7 @@ const seed = (patch) =>
     localStorage.setItem('founders-quest:v3', JSON.stringify({ ...d, ...p }))
   }, patch)
 const truth = () => page.evaluate(() => (document.querySelector('header').innerText.match(/(—|\d+%)/) || [])[0])
-const xp = () => page.evaluate(() => +(document.querySelector('header').innerText.match(/XP\s*(\d+)/) || [])[1])
+const xp = () => page.evaluate(() => +(document.querySelector('header').innerText.match(/(\d+)\s*XP/) || [])[1])
 
 // ── headers · favicon · CSP ──
 const resp = await page.goto(base + '/', { waitUntil: 'networkidle' })
@@ -45,7 +45,7 @@ check('favicon.svg 200', (await page.request.get(base + '/favicon.svg')).status(
 
 // ── metrics: null → E1 no-move → E2 move ──
 check('fresh Truth is —', (await truth()) === '—')
-await page.getByRole('button', { name: 'Registry' }).first().click()
+await page.getByRole('button', { name: 'Guardians' }).first().click()
 await page.locator('textarea').first().fill('Clinics will pay monthly')
 await page.locator('select').first().selectOption('dies')
 await page.getByRole('button', { name: 'Add guardian' }).click()
@@ -63,7 +63,7 @@ await page.locator('textarea').first().fill('Manager described losing money last
 await page.locator('button', { hasText: 'Clinics will pay' }).click()
 await page.getByRole('button', { name: 'Log evidence' }).click()
 await page.waitForTimeout(120)
-await page.getByRole('button', { name: 'Registry' }).first().click()
+await page.getByRole('button', { name: 'Guardians' }).first().click()
 await page.waitForTimeout(120)
 check('E2 derives tier E2·Said', /E2 · Said/.test(await page.evaluate(() => document.body.innerText)))
 await page.locator('select').filter({ has: page.locator('option', { hasText: 'invalidated' }) }).selectOption('validated')
@@ -82,8 +82,8 @@ await page.locator('textarea').first().fill('Saw the director override the front
 await page.locator('button', { hasText: 'Front desk holds' }).click()
 await page.getByRole('button', { name: 'Log evidence' }).click()
 await page.waitForTimeout(120)
-await page.getByRole('button', { name: 'Registry' }).first().click()
-await page.locator('div.rounded-lg', { hasText: 'Front desk holds the budget' }).locator('select').filter({ has: page.locator('option', { hasText: 'invalidated' }) }).selectOption('invalidated')
+await page.getByRole('button', { name: 'Guardians' }).first().click()
+await page.locator('div.rounded-xl', { hasText: 'Front desk holds the budget' }).locator('select').filter({ has: page.locator('option', { hasText: 'invalidated' }) }).selectOption('invalidated')
 await page.waitForTimeout(120)
 check('invalidation pays +15 (10+15=25)', (await xp()) === 25)
 
@@ -116,12 +116,12 @@ check('decision unlocks after a citation', !(await page.getByRole('button', { na
 // ── exports: dinner exclusion + Brief lead ──
 await seed({ dinnerCard: { text: 'DINNER_SECRET_CARD', updatedAt: '2026-07-10' }, dinnerSession: { date: '2026-07-10', cards: [{ id: 'x', name: 'Dana', text: 'DINNER_SECRET_SESSION', bucket: 'Been there', spoke: true }], timer: 5400 } })
 await page.reload({ waitUntil: 'networkidle' })
-const [jd] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '↓ Journal' }).click()])
+const [jd] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Journal' }).click()])
 const journal = readFileSync(await jd.path(), 'utf8')
 check('Journal has guardian', journal.includes('Clinics will pay monthly'))
 check('Journal excludes dinner card', !journal.includes('DINNER_SECRET_CARD'))
 check('Journal excludes dinner session', !journal.includes('DINNER_SECRET_SESSION'))
-const [bd] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '↓ Brief' }).click()])
+const [bd] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Brief' }).click()])
 const brief = readFileSync(await bd.path(), 'utf8')
 check('Brief leads with dinner card', brief.includes('DINNER_SECRET_CARD'))
 check('Brief excludes dinner session', !brief.includes('DINNER_SECRET_SESSION'))
@@ -142,7 +142,7 @@ check('key never in exportable blob', !(await page.evaluate(() => localStorage.g
 
 // ── mobile: no horizontal overflow ──
 await page.setViewportSize({ width: 375, height: 800 })
-for (const tab of ['Quest', 'Registry', 'Council', 'Trail', 'Dinner']) {
+for (const tab of ['Quest', 'Guardians', 'Council', 'Trail', 'Dinner']) {
   await page.locator('nav button', { hasText: tab }).click()
   await page.waitForTimeout(100)
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
