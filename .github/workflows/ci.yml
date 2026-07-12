@@ -84,6 +84,25 @@ jobs:
               && echo "domain attached" \
               || echo "::warning::domain attach did not report success (it may already exist — check Pages → Custom domains)"
           fi
+          # DNS — the domain-attach API does NOT auto-create the apex record (the dashboard
+          # flow does). Create the proxied apex CNAME if the zone has none, then nudge
+          # Pages to re-verify the domain.
+          if [ -n "${CLOUDFLARE_ZONE_ID:-}" ]; then
+            existing=$(curl -s -H "$AUTH" "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$DOMAIN" | jq -r '.result | length')
+            if [ "$existing" = "0" ]; then
+              echo "creating apex CNAME -> foundersquest.pages.dev"
+              curl -s -X POST -H "$AUTH" -H 'content-type: application/json' \
+                "$API/zones/$CLOUDFLARE_ZONE_ID/dns_records" \
+                --data '{"type":"CNAME","name":"@","content":"foundersquest.pages.dev","proxied":true}' \
+                | jq -e '.success' >/dev/null \
+                && echo "dns record created" \
+                || echo "::warning::dns record create failed — check the token has DNS: Edit on the zone"
+              curl -s -X PATCH -H "$AUTH" -H 'content-type: application/json' --data '{}' \
+                "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/foundersquest/domains/$DOMAIN" >/dev/null || true
+            else
+              echo "apex dns record exists (ok)"
+            fi
+          fi
           # Rate-limit /api/council via the http_ratelimit phase entrypoint (declarative → idempotent).
           # Free-plan legal: 10 requests / 10s, block 10s, 1 rule. Business+ can widen period and
           # mitigation_timeout to 600 for 10-minute windows (change the two values below).
